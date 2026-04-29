@@ -77,7 +77,7 @@ int main(int argc, char **argv)
         char output_buf[1024];
         for (int i = 1; i < argc; i++) {
                 at_execute(fd, strlen(argv[i]), argv[i], sizeof(output_buf), output_buf);
-                printf("%s\n", output_buf);
+                printf("%s\n\n\n", output_buf);
         }
         close(fd);
         return 0;

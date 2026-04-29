@@ -10,7 +10,7 @@
 
 int at_get_port(void)
 {
-        int fd = open("/dev/ttyUSB2", O_RDWR);
+        int fd = open("/dev/ttyUSB2", O_RDWR); // TODO: automatinė paieška
 
         return fd;
 }
@@ -35,30 +35,28 @@ int at_setup_port(int fd)
 
         cfmakeraw(&options);
         options.c_cc[VMIN] = 0;
-        options.c_cc[VTIME] = 20;
+        options.c_cc[VTIME] = 50;
         tcsetattr(fd, TCSANOW, &options);
         return EXIT_SUCCESS;
 }
 
 
-int at_execute(int fd, int cmd_size, char *cmd, int output_buf_size, char *output_buf)
+int at_execute(int fd, int cmd_size, char *cmd, int output_buf_size, char *output_buf) // TODO: filtruoti įvykius prieš komandos paleidimą
 {
         if (fd < 0 || cmd_size < 2 || output_buf_size < 2 || cmd == NULL || output_buf == NULL) {
                 return EXIT_FAILURE;
         }
-        // memset(output_buf, 0, output_buf_size);
         tcflush(fd, TCIFLUSH);
         write(fd, cmd, cmd_size);
         const char cmd_end[] = "\r\n";
         write(fd, cmd_end, sizeof(cmd_end));
         int n = 0;
         int bytes = 0;
-        while ((bytes = read(fd, &output_buf[n], 1)) > 0) {
+        while ((bytes = read(fd, &output_buf[n], 1)) > 0 && n + 1 < output_buf_size) {
                 n += bytes;
                 output_buf[n] = '\0';
                 if (strstr(output_buf, "OK") || strstr(output_buf, "ERROR")) // TODO: reik lygint tik buferio pabaiga
                         break;
-
         }
 
         return EXIT_SUCCESS;
