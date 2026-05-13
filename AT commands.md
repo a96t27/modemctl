@@ -1,3 +1,5 @@
+# Komandos duomenų gavimui
+
 |         Komanda          | Aprašymas                                              | Rezultatas                                                                                                                    |
 | :----------------------: | :----------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------- |
 |          AT+GSN          | IMEI;                                                  | 15 dešimtainių skaitmenų kodas                                                                                                |
@@ -16,3 +18,17 @@
 |            ?             | Naudojamą APN;                                         |                                                                                                                               |
 |         AT+CNUM          | Telefono numerį (jei prieinamas);                      |                                                                                                                               |
 |         AT+CMGL          | SMS žinutes (sudėtingesnė dalis – multi-line parsing). |                                                                                                                               |
+
+# Komandos išvedimo nustatymui
+
+| Komanda | Aprašymas                           |
+| :-----: | :---------------------------------- |
+|  ATQ0   | Grazinti rezultato koda             |
+|  ATV1   | Grazina ok/error, o ne klaidos koda |
+|  ATE1   | Grazinti gautas komandas            |
+
+# Kitos komandos
+
+| Komanda | Aprašymas              |
+| :-----: | :--------------------- |
+|  AT&V   | Dabartiniai nustatymai |
