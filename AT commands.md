@@ -21,14 +21,27 @@
 
 # Komandos išvedimo nustatymui
 
-| Komanda | Aprašymas                           |
-| :-----: | :---------------------------------- |
-|  ATQ0   | Grazinti rezultato koda             |
-|  ATV1   | Grazina ok/error, o ne klaidos koda |
-|  ATE1   | Grazinti gautas komandas            |
+|  Komanda  | Aprašymas                                           |
+| :-------: | :-------------------------------------------------- |
+|   ATQ0    | Grazinti rezultato koda                             |
+|   ATV1    | Grazina ok/error, o ne klaidos koda                 |
+|   ATE1    | Grazinti gautas komandas                            |
+| AT+CMEE=2 | Grazinti +CMS ERROR ir +CME ERROR us klaidos tekstu |
+|   AT&V    | Dabartiniai nustatymai                              |
+| AT+CMEE?  | Dabartinis klaidų formatas                          |
 
-# Kitos komandos
+# Programos vykdymas
 
-| Komanda | Aprašymas              |
-| :-----: | :--------------------- |
-|  AT&V   | Dabartiniai nustatymai |
+nuskaityti cli parametrus ->
+atidaryti sasajos deskriptorių ir nustatyti jo parametrus (koks timeout, koks boud speed ir t.t.) ->
+išsaugoti dabartinius modemo nustatymus ->
+pakeisti modemo nustatymus programos veikimui (pvz.: AT+CMEE=2, ATV1 ir pan.) ->
+kol yra užklausti duomenys:
+
+        write() AT komandą
+        read() iki OK arba ERROR, +CME ERROR: <tekstas>, +CMS ERROR: <tekstas>
+        nuskaitomas komandos rezultatas
+        pagal parametruose nurodyta formata isvedamas rezultatas i konsole
+
+atstatyti modemo parametrus kaip buvo pries programos paleidima ->
+atlaisvinti atminti, uždaryti deskriptorių ir t.t.

@@ -1,8 +1,13 @@
 #ifndef SERIAL_IO_H
 #define SERIAL_IO_H
 
-int at_get_port(void);
+struct ModemSettings {
+        int CMEE;
+};
+
+
+int at_get_port(char *path);
 int at_setup_port(int fd);
-int at_execute(int fd, int cmd_size, char *cmd, int output_buf_size, char *output_buf);
+struct text_line *at_execute(int fd, int cmd_size, char *cmd);
 
 #endif

@@ -1,6 +1,6 @@
 CFLAGS += -Wall -Wextra -pedantic
 CPPFLAGS += -I./include
-LDFLAGS += -largp
+LDFLAGS += -largp -lcjson
 BIN = bin/modemctl
 BUILD_DIR := build
 SRCS = $(wildcard src/*.c)

@@ -9,7 +9,7 @@ include $(INCLUDE_DIR)/package.mk
 define Package/modemctl
 	CATEGORY := Net
 	TITLE:=Modemctl
-	
+	DEPENDS := cJSON
 endef
 
 define Package/modemctl/description
