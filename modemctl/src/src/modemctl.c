@@ -12,9 +12,11 @@
 #include <stdlib.h>
 #include <linux/limits.h>
 #include <math.h>
-#include <text_lines.h>
 #include <cjson/cJSON.h>
 #include <commands.h>
+#include <stdbool.h>
+#include <modemctl_context.h>
+#include <response.h>
 
 #define DEFAULT_DEVICE "/dev/ttyUSB2"
 
@@ -29,50 +31,51 @@ void sig_handler(int sigint)
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state);
 struct Arguments {
-        int all;
-        int imei;
-        int opertaor;
-        int signal;
-        int cell;
-        int band;
-        int status;
-        int json;
+        bool all;
+        bool imei;
+        bool opertaor;
+        bool signal;
+        bool cell;
+        bool band;
+        bool status;
+        bool json;
         char device[PATH_MAX];
-        int debug;
-        int watch;
+        bool debug;
+        bool watch;
+        struct cJSON *at_cmds; // array of strings
 };
 
 static char doc[] = "Modemctl - command line tool to control modems";
 static char args_doc[] = "";
 static struct argp_option options[] = {
-        { "imei", 'i', 0, 0, "Get IMEI", 0 },
-        { "status", 'u', 0, 0, "Get modem status", 0 },
+        // { "imei", 'i', 0, 0, "Get IMEI", 0 },
+        // { "status", 'u', 0, 0, "Get modem status", 0 },
         { "device", 'd', DEFAULT_DEVICE, 0, "Set AT command port", 0 },
         { "debug", 'g', 0, 0, "Toggle debug mode", 0 },
+        { "json", 'j', 0, 0, "Get json", 0},
+        { "at", 'a', "AT_COMMAND", 0, "Execute AT command", 0},
         // { "all", 'a', 0, 0, "get all", 0},
         // { "operator", 'o', 0 ,0, "Get operator", 0 },
         // { "signal", 's', 0, 0, "Get signal level", 0 },
         // { "cell", 'c', 0, 0, "Get cell", 0 },
         // { "band", 'b', 0, 0, "Get band", 0 },
-        // { "json", 'j', 0, 0, "Get json", 0},
         // { "watch", 'w', 0, 0, "keep watching", 0 },
         { 0 },
 };
 static struct argp _argp = { options, parse_opt, args_doc, doc, NULL, NULL, NULL };
 
-
 int main(int argc, char **argv)
 {
-        signal(SIGINT, sig_handler);
-        signal(SIGTERM, sig_handler);
-        signal(SIGQUIT, sig_handler);
-        signal(SIGABRT, SIG_IGN);
-        signal(SIGILL, SIG_IGN);
-        signal(SIGFPE, SIG_IGN);
-        signal(SIGHUP, SIG_IGN);
-        signal(SIGIO, SIG_IGN);
-        signal(SIGUSR1, SIG_IGN);
-        signal(SIGUSR2, SIG_IGN);
+        // signal(SIGINT, sig_handler);
+        // signal(SIGTERM, sig_handler);
+        // signal(SIGQUIT, sig_handler);
+        // signal(SIGABRT, SIG_IGN);
+        // signal(SIGILL, SIG_IGN);
+        // signal(SIGFPE, SIG_IGN);
+        // signal(SIGHUP, SIG_IGN);
+        // signal(SIGIO, SIG_IGN);
+        // signal(SIGUSR1, SIG_IGN);
+        // signal(SIGUSR2, SIG_IGN);
 
         struct Arguments args = { 0 };
         strcpy(args.device, DEFAULT_DEVICE);
@@ -85,14 +88,69 @@ int main(int argc, char **argv)
         }
 
         at_setup_port(fd);
-        if (args.imei) {
-                struct cJSON *iemi_resp = get_imei(fd);
-                char *txt = cJSON_Print(iemi_resp);
-                printf("%s\n", txt);
-                cJSON_Delete(iemi_resp);
-                free(txt);
+        struct ModemctlContext ctx = {
+                .fd = fd,
+        };
+        struct cJSON *responses = cJSON_CreateArray();
+        if (args.at_cmds != NULL) {
+                struct cJSON *cmd = NULL;
+                cJSON_ArrayForEach(cmd, args.at_cmds)
+                {
+                        char *txt = cJSON_GetStringValue(cmd);
+                        struct cJSON *resp = at_execute(&ctx, txt, strlen(txt));
+                        cJSON_AddItemToArray(responses, resp);
+                }
         }
+        if (args.json) {
+                char *txt = cJSON_Print(responses);
+                printf("%s\n", txt);
+        } else {
+                struct cJSON *resp = NULL;
+                cJSON_ArrayForEach(resp, responses)
+                {
+                        // if (!is_valid_response(resp)) {
+                        //         continue;
+                        // }
+                        struct cJSON *type_json = cJSON_GetObjectItemCaseSensitive(resp, "type");
+                        char *type = cJSON_GetStringValue(type_json);
+                        struct cJSON *data = cJSON_GetObjectItemCaseSensitive(resp, "data");
+                        if (strcmp(type, "at") == 0 && cJSON_IsObject(data)) {
+                                struct cJSON *item = cJSON_GetObjectItemCaseSensitive(data, "command");
+                                char *txt = cJSON_GetStringValue(item);
+                                printf("\n< %s\n", txt);
+                                item = cJSON_GetObjectItemCaseSensitive(data, "result");
+                                struct cJSON *line = NULL;
+                                cJSON_ArrayForEach(line, item)
+                                {
+                                        txt = cJSON_GetStringValue(line);
+                                        printf("> %s\n", txt);
+                                }
+                        }
+                }
+        }
+        // if (args.imei) {
+        //         struct cJSON *iemi_resp = get_imei(fd, args.debug);
+        //         cJSON_AddItemToArray(responses, iemi_resp);
+        // }
+        // char *txt = NULL;
+        // struct cJSON *resp = NULL;
+        // if (args.json) {
+        //         txt = cJSON_Print(responses);
+        //         printf("%s\n", txt);
+        //         free(txt);
+        // } else {
+        //         cJSON_ArrayForEach(resp, responses)
+        //         {
+        //                 struct cJSON *msg = cJSON_GetObjectItemCaseSensitive(resp, "message");
+        //                 if (cJSON_IsString(msg)) {
+        //                         txt = cJSON_GetStringValue(msg);
+        //                         printf("%s\n", txt);
+        //                 }
+        //         }
+        // }
+        cJSON_Delete(responses);
         close(fd);
+        cJSON_Delete(args.at_cmds);
         return EXIT_SUCCESS;
 }
 
@@ -106,13 +164,23 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
                 arguments->device[PATH_MAX - 1] = '\0';
                 break;
         case 'i':
-                arguments->imei = 1;
+                arguments->imei = true;
                 break;
         case 'u':
-                arguments->status = 1;
+                arguments->status = true;
                 break;
         case 'g':
-                arguments->debug = 1;
+                arguments->debug = true;
+                break;
+        case 'j':
+                arguments->json = true;
+                break;
+        case 'a':
+                if (arguments->at_cmds == NULL) {
+                        arguments->at_cmds = cJSON_CreateArray();
+                }
+                struct cJSON *string_json = cJSON_CreateString(arg);
+                cJSON_AddItemToArray(arguments->at_cmds, string_json);
                 break;
         case ARGP_KEY_ARG:
                 if (state->arg_num > 0)

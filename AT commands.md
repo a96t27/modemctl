@@ -1,23 +1,23 @@
 # Komandos duomenų gavimui
 
-|         Komanda          | Aprašymas                                              | Rezultatas                                                                                                                    |
-| :----------------------: | :----------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------- |
-|          AT+GSN          | IMEI;                                                  | 15 dešimtainių skaitmenų kodas                                                                                                |
-|           ATI            | Modemo informaciją (modelį, gamintoją);                | Tris eilutės: Gamintojas, modelis, revizija                                                                                   |
-|  AT+COPS? arba AT+QSPN   | Operatorių, prie kurio šiuo metu yra prisijungta;      |                                                                                                                               |
-|         AT+CREG?         | Prisijungimo prie tinklo statusą;                      | +CREG: <n>,<stat>[,<lac>,<ci>[,<Act>]] kai n!=0 - prijungta prie tinklo,                                                      |
-|                          |                                                        | stat: 0, 2 ir 3 - ne priregistruota, 1 ir 5 - priregistruota,                                                                 |
-|                          |                                                        | naminis tinklas, 4 - nežinoma                                                                                                 |
-|      AT+QCFG="band"      | Mobilaus ryšio dažnių juostą (angl. band);             | +QCFG: "band",<bandval>,<ltebandval>,<tdsbandval> bandval ir ltebandval šešioliktainiai skaičiai nurodantys dažnių vėliavėles |
-| AT+QSIMSTAT? AT+QSIMDET? | SIM kortelės statusą (ar įdėta, ar aktyvi);            |                                                                                                                               |
-|  AT+QENG="servingcell"   | Aptarnaujančios celės (serving cell) informaciją;      | Skirtingi formatai LTE ir WCDMA režimui                                                                                       |
-| AT+QENG="neighbourcell"  | Gretimas celes (neighbor cells);                       | Skirtingi formatai LTE ir WCDMA režimui                                                                                       |
-|          AT+CSQ          | Signalo stiprumą;                                      | +CSQ: <rssi>,<ber> rssi: 0-31 rysio stiprumas, 99 - nezinomas stiprumas                                                       |
-|            ?             | IP adresą (jei yra aktyvi duomenų sesija);             |                                                                                                                               |
-|            ?             | Modemo temperatūrą (jei palaikoma);                    |                                                                                                                               |
-|            ?             | Naudojamą APN;                                         |                                                                                                                               |
-|         AT+CNUM          | Telefono numerį (jei prieinamas);                      |                                                                                                                               |
-|         AT+CMGL          | SMS žinutes (sudėtingesnė dalis – multi-line parsing). |                                                                                                                               |
+|         Komanda         | Aprašymas                                              | Rezultatas                                                                                                                    |
+| :---------------------: | :----------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------- |
+|         AT+GSN          | IMEI;                                                  | 15 dešimtainių skaitmenų kodas                                                                                                |
+|           ATI           | Modemo informaciją (modelį, gamintoją);                | Tris eilutės: Gamintojas, modelis, revizija                                                                                   |
+|  AT+COPS? arba AT+QSPN  | Operatorių, prie kurio šiuo metu yra prisijungta;      |                                                                                                                               |
+|        AT+CREG?         | Prisijungimo prie tinklo statusą;                      | +CREG: <n>,<stat>[,<lac>,<ci>[,<Act>]] kai n!=0 - prijungta prie tinklo,                                                      |
+|                         |                                                        | stat: 0, 2 ir 3 - ne priregistruota, 1 ir 5 - priregistruota,                                                                 |
+|                         |                                                        | naminis tinklas, 4 - nežinoma                                                                                                 |
+|     AT+QCFG="band"      | Mobilaus ryšio dažnių juostą (angl. band);             | +QCFG: "band",<bandval>,<ltebandval>,<tdsbandval> bandval ir ltebandval šešioliktainiai skaičiai nurodantys dažnių vėliavėles |
+|      AT+QSIMSTAT?       | SIM kortelės statusą (ar įdėta, ar aktyvi);            |                                                                                                                               |
+|  AT+QENG="servingcell"  | Aptarnaujančios celės (serving cell) informaciją;      | Skirtingi formatai LTE ir WCDMA režimui                                                                                       |
+| AT+QENG="neighbourcell" | Gretimas celes (neighbor cells);                       | Skirtingi formatai LTE ir WCDMA režimui                                                                                       |
+|         AT+CSQ          | Signalo stiprumą;                                      | +CSQ: <rssi>,<ber> rssi: 0-31 rysio stiprumas, 99 - nezinomas stiprumas                                                       |
+|            ?            | IP adresą (jei yra aktyvi duomenų sesija);             |                                                                                                                               |
+|            ?            | Modemo temperatūrą (jei palaikoma);                    |                                                                                                                               |
+|            ?            | Naudojamą APN;                                         |                                                                                                                               |
+|         AT+CNUM         | Telefono numerį (jei prieinamas);                      |                                                                                                                               |
+|         AT+CMGL         | SMS žinutes (sudėtingesnė dalis – multi-line parsing). |                                                                                                                               |
 
 # Komandos išvedimo nustatymui
 
@@ -45,3 +45,29 @@ kol yra užklausti duomenys:
 
 atstatyti modemo parametrus kaip buvo pries programos paleidima ->
 atlaisvinti atminti, uždaryti deskriptorių ir t.t.
+
+# JSON formatas
+
+```json
+[
+  {
+    // pagrindinė struktūra
+    "success": true,
+    "message": "Got imei: 000000000000000",
+    "type": "imei", // "imei", kai panaudotas --imei
+    "data": {
+      "imei": "000000000000000"
+    }
+  },
+  {
+    // --at AT+GSN rezultatas (arba jeigu panaudotas --debug parametras)
+    "success": true,
+    "message": "Executed AT+GSN command",
+    "type": "at",
+    "data": {
+      "command": "AT_CMD",
+      "result": ["AT_CMD", "some_value", "", "OK"]
+    }
+  }
+]
+```

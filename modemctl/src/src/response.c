@@ -1,0 +1,58 @@
+#include <response.h>
+
+#include <stddef.h>
+#include <cjson/cJSON.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdbool.h>
+
+
+struct cJSON *create_response(bool success, const char *type, size_t type_len, const char *message, size_t message_len, struct cJSON *data)
+{
+        if (type == NULL || message == NULL) {
+                return NULL;
+        }
+        struct cJSON *resp = cJSON_CreateObject();
+        if (resp == NULL) {
+                return NULL;
+        }
+
+        cJSON_AddBoolToObject(resp, "success", success);
+
+        char buf[RESPONSE_BUFFER_SIZE] = { 0 };
+
+        snprintf(buf, sizeof(buf), "%.*s", type_len, type);
+        cJSON_AddStringToObject(resp, "type", buf);
+
+        snprintf(buf, sizeof(buf), "%.*s", message_len, message);
+        cJSON_AddStringToObject(resp, "message", buf);
+
+        if (cJSON_IsObject(data)) {
+                cJSON_AddItemToObject(resp, "data", data);
+        }
+        return resp;
+}
+
+bool is_valid_response(struct cJSON *resp)
+{
+        if (!cJSON_IsObject(resp)) {
+                return false;
+        }
+        struct cJSON *item = cJSON_GetObjectItemCaseSensitive(resp, "success");
+        if (!cJSON_IsBool(item)) {
+                return false;
+        }
+        item = cJSON_GetObjectItemCaseSensitive(resp, "type");
+        if (!cJSON_IsString(item)) {
+                return false;
+        }
+        item = cJSON_GetObjectItemCaseSensitive(resp, "message");
+        if (!cJSON_IsString(item)) {
+                return false;
+        }
+        item = cJSON_GetObjectItemCaseSensitive(resp, "data");
+        if (item != NULL && !cJSON_IsObject(item)) {
+                return false;
+        }
+        return true;
+}
