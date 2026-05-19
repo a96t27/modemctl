@@ -84,7 +84,6 @@ struct cJSON *parse_get_imei(struct cJSON *at_resp)
         cJSON_AddStringToObject(data, "imei", imei);
         char msg_buf[RESPONSE_BUFFER_SIZE] = { 0 };
         int msg_len = snprintf(msg_buf, sizeof(msg_buf), "IMEI: %.*s", imei_len, imei); // kartais reiksme neigema
-        msg_len = msg_len < sizeof(msg_buf) - 2 ? msg_len : sizeof(msg_buf) - 2;
         char type[] = "imei";
         return create_response(success, type, sizeof(type) - 1, msg_buf, msg_len, data);
 }

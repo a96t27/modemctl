@@ -13,7 +13,6 @@
 #include <linux/limits.h>
 #include <math.h>
 #include <cjson/cJSON.h>
-#include <commands.h>
 #include <stdbool.h>
 #include <modemctl_context.h>
 #include <response.h>
