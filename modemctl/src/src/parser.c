@@ -37,27 +37,6 @@ bool is_end(const char *line, size_t len)
         return is_ok(line, len) || is_error(line, len);
 }
 
-// struct text_line *skip_empty(struct text_line *text_lines)
-// {
-//         if (text_lines == NULL) {
-//                 return NULL;
-//         }
-//         struct text_line *temp = text_lines;
-//         while (temp != NULL && is_empty(temp)) {
-//                 temp = temp->next;
-//         }
-//         return temp;
-// }
-
-// struct text_line *next_non_empty(struct text_line *text_lines)
-// {
-//         if (text_lines == NULL) {
-//                 return NULL;
-//         }
-//         struct text_line *temp = text_lines->next;
-//         return skip_empty(temp);
-// }
-
 bool is_unsolicited_event(const char *line, size_t len) // gal but reikia filtruoti konkrecius pranesimus
 {
         if (is_empty(line, len)) {
