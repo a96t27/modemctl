@@ -17,6 +17,7 @@
 #include <stdbool.h>
 #include <modemctl_context.h>
 #include <response.h>
+#include <parser.h>
 
 #define DEFAULT_DEVICE "/dev/ttyUSB2"
 
@@ -48,12 +49,12 @@ struct Arguments {
 static char doc[] = "Modemctl - command line tool to control modems";
 static char args_doc[] = "";
 static struct argp_option options[] = {
-        // { "imei", 'i', 0, 0, "Get IMEI", 0 },
-        // { "status", 'u', 0, 0, "Get modem status", 0 },
+        { "imei", 'i', 0, 0, "Get IMEI", 0 },
         { "device", 'd', DEFAULT_DEVICE, 0, "Set AT command port", 0 },
         { "debug", 'g', 0, 0, "Toggle debug mode", 0 },
         { "json", 'j', 0, 0, "Get json", 0},
         { "at", 'a', "AT_COMMAND", 0, "Execute AT command", 0},
+        // { "status", 'u', 0, 0, "Get modem status", 0 },
         // { "all", 'a', 0, 0, "get all", 0},
         // { "operator", 'o', 0 ,0, "Get operator", 0 },
         // { "signal", 's', 0, 0, "Get signal level", 0 },
@@ -66,16 +67,16 @@ static struct argp _argp = { options, parse_opt, args_doc, doc, NULL, NULL, NULL
 
 int main(int argc, char **argv)
 {
-        // signal(SIGINT, sig_handler);
-        // signal(SIGTERM, sig_handler);
-        // signal(SIGQUIT, sig_handler);
-        // signal(SIGABRT, SIG_IGN);
-        // signal(SIGILL, SIG_IGN);
-        // signal(SIGFPE, SIG_IGN);
-        // signal(SIGHUP, SIG_IGN);
-        // signal(SIGIO, SIG_IGN);
-        // signal(SIGUSR1, SIG_IGN);
-        // signal(SIGUSR2, SIG_IGN);
+        signal(SIGINT, sig_handler);
+        signal(SIGTERM, sig_handler);
+        signal(SIGQUIT, sig_handler);
+        signal(SIGABRT, SIG_IGN);
+        signal(SIGILL, SIG_IGN);
+        signal(SIGFPE, SIG_IGN);
+        signal(SIGHUP, SIG_IGN);
+        signal(SIGIO, SIG_IGN);
+        signal(SIGUSR1, SIG_IGN);
+        signal(SIGUSR2, SIG_IGN);
 
         struct Arguments args = { 0 };
         strcpy(args.device, DEFAULT_DEVICE);
@@ -101,16 +102,30 @@ int main(int argc, char **argv)
                         cJSON_AddItemToArray(responses, resp);
                 }
         }
+
+        if (args.imei) {
+                char cmd[] = "AT+GSN";
+                struct cJSON *at_resp = at_execute(&ctx, cmd, sizeof(cmd) - 1);
+                struct cJSON *parser_resp = parse_get_imei(at_resp);
+                if (args.debug) {
+                        cJSON_AddItemToArray(responses, at_resp);
+                } else {
+                        cJSON_Delete(at_resp);
+                }
+                cJSON_AddItemToArray(responses, parser_resp);
+        }
+
         if (args.json) {
                 char *txt = cJSON_Print(responses);
                 printf("%s\n", txt);
+                free(txt);
         } else {
                 struct cJSON *resp = NULL;
                 cJSON_ArrayForEach(resp, responses)
                 {
-                        // if (!is_valid_response(resp)) {
-                        //         continue;
-                        // }
+                        if (!is_valid_response(resp)) {
+                                continue;
+                        }
                         struct cJSON *type_json = cJSON_GetObjectItemCaseSensitive(resp, "type");
                         char *type = cJSON_GetStringValue(type_json);
                         struct cJSON *data = cJSON_GetObjectItemCaseSensitive(resp, "data");
@@ -125,32 +140,18 @@ int main(int argc, char **argv)
                                         txt = cJSON_GetStringValue(line);
                                         printf("> %s\n", txt);
                                 }
+                        } else {
+                                struct cJSON *msg_json = cJSON_GetObjectItemCaseSensitive(resp, "message");
+                                char *msg = cJSON_GetStringValue(msg_json);
+                                printf("%s\n", msg);
                         }
                 }
         }
-        // if (args.imei) {
-        //         struct cJSON *iemi_resp = get_imei(fd, args.debug);
-        //         cJSON_AddItemToArray(responses, iemi_resp);
-        // }
-        // char *txt = NULL;
-        // struct cJSON *resp = NULL;
-        // if (args.json) {
-        //         txt = cJSON_Print(responses);
-        //         printf("%s\n", txt);
-        //         free(txt);
-        // } else {
-        //         cJSON_ArrayForEach(resp, responses)
-        //         {
-        //                 struct cJSON *msg = cJSON_GetObjectItemCaseSensitive(resp, "message");
-        //                 if (cJSON_IsString(msg)) {
-        //                         txt = cJSON_GetStringValue(msg);
-        //                         printf("%s\n", txt);
-        //                 }
-        //         }
-        // }
         cJSON_Delete(responses);
         close(fd);
-        cJSON_Delete(args.at_cmds);
+        if (args.at_cmds) {
+                cJSON_Delete(args.at_cmds);
+        }
         return EXIT_SUCCESS;
 }
 

@@ -56,3 +56,27 @@ bool is_valid_response(struct cJSON *resp)
         }
         return true;
 }
+
+bool is_at_response(struct cJSON *resp)
+{
+        if (!is_valid_response(resp)) {
+                return false;
+        }
+        char *type = cJSON_GetStringValue(cJSON_GetObjectItem(resp, "type"));
+        if (strcmp(type, "at") != 0) {
+                return false;
+        }
+        struct cJSON *at_data = cJSON_GetObjectItemCaseSensitive(resp, "data");
+        if (at_data == NULL) {
+                return false;
+        }
+        struct cJSON *at_result = cJSON_GetObjectItemCaseSensitive(at_data, "result");
+        if (!cJSON_IsArray(at_result)) {
+                return false;
+        }
+        struct cJSON *at_command = cJSON_GetObjectItemCaseSensitive(at_data, "command");
+        if (!cJSON_IsString(at_command)) {
+                return false;
+        }
+        return true;
+}
