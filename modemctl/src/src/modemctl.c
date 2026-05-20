@@ -17,8 +17,7 @@
 #include <modemctl_context.h>
 #include <response.h>
 #include <parser.h>
-
-#define DEFAULT_DEVICE "/dev/ttyUSB2"
+#include <printing_utils.h>
 
 int running = 1;
 
@@ -49,7 +48,7 @@ static char doc[] = "Modemctl - command line tool to control modems";
 static char args_doc[] = "";
 static struct argp_option options[] = {
         { "imei", 'i', 0, 0, "Get IMEI", 0 },
-        { "device", 'd', DEFAULT_DEVICE, 0, "Set AT command port", 0 },
+        { "device", 'd', "PATH_TO_DEVICE", 0, "Set AT command port", 0 },
         { "debug", 'g', 0, 0, "Toggle debug mode", 0 },
         { "json", 'j', 0, 0, "Get json", 0},
         { "at", 'a', "AT_COMMAND", 0, "Execute AT command", 0},
@@ -63,6 +62,27 @@ static struct argp_option options[] = {
         { 0 },
 };
 static struct argp _argp = { options, parse_opt, args_doc, doc, NULL, NULL, NULL };
+
+int execute_cmds(struct ModemctlContext *ctx, struct cJSON *cmds, struct cJSON *responses)
+{
+        if (ctx == NULL || ctx->fd < 0 || !cJSON_IsArray(cmds) || !cJSON_IsArray(responses)) {
+                return EXIT_FAILURE;
+        }
+        struct cJSON *cmd = NULL;
+        cJSON_ArrayForEach(cmd, cmds)
+        {
+                if (!cJSON_IsString(cmd)) {
+                        continue;
+                }
+                char *txt = cJSON_GetStringValue(cmd);
+                struct cJSON *resp = at_execute(ctx, txt, strlen(txt));
+                if (resp == NULL) {
+                        continue; // TODO: reikia generuoti klaida
+                }
+                cJSON_AddItemToArray(responses, resp);
+        }
+        return EXIT_SUCCESS;
+}
 
 int main(int argc, char **argv)
 {
@@ -78,31 +98,38 @@ int main(int argc, char **argv)
         signal(SIGUSR2, SIG_IGN);
 
         struct Arguments args = { 0 };
-        strcpy(args.device, DEFAULT_DEVICE);
+        int ret = EXIT_SUCCESS;
+        if (argp_parse(&_argp, argc, argv, ARGP_NO_EXIT, 0, &args) != EXIT_SUCCESS) {
+                ret = EXIT_FAILURE;
+                goto err_failed_argp;
+        }
 
-        argp_parse(&_argp, argc, argv, 0, 0, &args);
-        int fd = at_get_port(args.device);
+        int fd = -1;
+        if (strnlen(args.device, PATH_MAX) > 0) {
+                fd = at_get_port(args.device);
+        } else {
+                fd = at_find_port();
+        }
         if (fd < 0) {
                 printf("Failed to open device\n");
-                return EXIT_FAILURE;
+                ret = EXIT_FAILURE;
+                goto err_failed_to_open_file;
         }
 
         at_setup_port(fd);
         struct ModemctlContext ctx = {
                 .fd = fd,
         };
+
         struct cJSON *responses = cJSON_CreateArray();
+
         if (args.at_cmds != NULL) {
-                struct cJSON *cmd = NULL;
-                cJSON_ArrayForEach(cmd, args.at_cmds)
-                {
-                        char *txt = cJSON_GetStringValue(cmd);
-                        struct cJSON *resp = at_execute(&ctx, txt, strlen(txt));
-                        cJSON_AddItemToArray(responses, resp);
+                if (execute_cmds(&ctx, args.at_cmds, responses) != EXIT_SUCCESS) {
+                        printf("Failed to execute commands\n");
                 }
         }
 
-        if (args.imei) {
+        if (args.imei) { // TODO: ideti i atskira funkcija?
                 char cmd[] = "AT+GSN";
                 struct cJSON *at_resp = at_execute(&ctx, cmd, sizeof(cmd) - 1);
                 struct cJSON *parser_resp = parse_get_imei(at_resp);
@@ -119,39 +146,16 @@ int main(int argc, char **argv)
                 printf("%s\n", txt);
                 free(txt);
         } else {
-                struct cJSON *resp = NULL;
-                cJSON_ArrayForEach(resp, responses)
-                {
-                        if (!is_valid_response(resp)) {
-                                continue;
-                        }
-                        struct cJSON *type_json = cJSON_GetObjectItemCaseSensitive(resp, "type");
-                        char *type = cJSON_GetStringValue(type_json);
-                        struct cJSON *data = cJSON_GetObjectItemCaseSensitive(resp, "data");
-                        if (strcmp(type, "at") == 0 && cJSON_IsObject(data)) {
-                                struct cJSON *item = cJSON_GetObjectItemCaseSensitive(data, "command");
-                                char *txt = cJSON_GetStringValue(item);
-                                printf("\n< %s\n", txt);
-                                item = cJSON_GetObjectItemCaseSensitive(data, "result");
-                                struct cJSON *line = NULL;
-                                cJSON_ArrayForEach(line, item)
-                                {
-                                        txt = cJSON_GetStringValue(line);
-                                        printf("> %s\n", txt);
-                                }
-                        } else {
-                                struct cJSON *msg_json = cJSON_GetObjectItemCaseSensitive(resp, "message");
-                                char *msg = cJSON_GetStringValue(msg_json);
-                                printf("%s\n", msg);
-                        }
-                }
+                print_responses(responses);
         }
         cJSON_Delete(responses);
         close(fd);
+err_failed_to_open_file:
+err_failed_argp:
         if (args.at_cmds) {
                 cJSON_Delete(args.at_cmds);
         }
-        return EXIT_SUCCESS;
+        return ret;
 }
 
 

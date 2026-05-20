@@ -9,7 +9,7 @@
 
 struct cJSON *create_response(bool success, const char *type, size_t type_len, const char *message, size_t message_len, struct cJSON *data)
 {
-        if (type == NULL || message == NULL) {
+        if (type == NULL || message == NULL || type_len == 0 || message_len == 0) {
                 return NULL;
         }
         struct cJSON *resp = cJSON_CreateObject();

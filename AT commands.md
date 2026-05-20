@@ -1,4 +1,6 @@
-# Komandos duomenų gavimui
+# Komandos
+
+## Komandos duomenų gavimui
 
 |         Komanda         | Aprašymas                                              | Rezultatas                                                                                                                    |
 | :---------------------: | :----------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------- |
@@ -19,7 +21,7 @@
 |         AT+CNUM         | Telefono numerį (jei prieinamas);                      |                                                                                                                               |
 |         AT+CMGL         | SMS žinutes (sudėtingesnė dalis – multi-line parsing). |                                                                                                                               |
 
-# Komandos išvedimo nustatymui
+## Komandos išvedimo nustatymui
 
 |  Komanda  | Aprašymas                                           |
 | :-------: | :-------------------------------------------------- |
@@ -30,7 +32,7 @@
 |   AT&V    | Dabartiniai nustatymai                              |
 | AT+CMEE?  | Dabartinis klaidų formatas                          |
 
-# Programos vykdymas
+## Programos vykdymas
 
 nuskaityti cli parametrus ->
 atidaryti sasajos deskriptorių ir nustatyti jo parametrus (koks timeout, koks boud speed ir t.t.) ->
@@ -46,7 +48,7 @@ kol yra užklausti duomenys:
 atstatyti modemo parametrus kaip buvo pries programos paleidima ->
 atlaisvinti atminti, uždaryti deskriptorių ir t.t.
 
-# JSON formatas
+## JSON formatas
 
 ```json
 [
@@ -71,3 +73,21 @@ atlaisvinti atminti, uždaryti deskriptorių ir t.t.
   }
 ]
 ```
+
+# /dev/ttyUSBx radimas
+
+## Nuorodos
+
+https://superuser.com/questions/1711806/the-naming-convention-of-folders-in-sys-bus-usb-devices
+
+## paieška
+
+tikrinamas `/sys/bus/usb/devices/` direktorijos turinis
+kiekvienai direktorijai `<bus>-<port>/`:
+
+    tikrinami `/sys/bus/usb/devices/<bus>-<port>/idVendor` ir `/sys/bus/usb/devices/<bus>-<port>/idProduct`
+    jeigu identifikatoriai nera žinomi - direktorija praleidžiama
+    tikrinamos direktorijos `/sys/bus/usb/devices/<bus>-<port>/<bus>-<port>:<config>.2` jeigu tokios yra:
+      ieškomos subderiktorijos `ttyUSB<n>` formato
+      išsaugomas direktorijos pavadinimas
+      gražinamas kelias `/dev/ttyUSB<n>`S
