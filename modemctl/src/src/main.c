@@ -98,27 +98,26 @@ int main(int argc, char **argv)
         if (get_modem(at_port.usb_info.vendor_id, at_port.usb_info.product_id, &modem) != EXIT_SUCCESS) {
                 printf("Failed to find modem\n");
         }
-        if (args.imei) { // TODO: ideti i atskira funkcija?
-                struct action *a = &modem.actions[GET_IMEI];
-                if (a->at_cmd == NULL) {
-                        // continue; // FIX: should do something about it
+        for (int i = 0; i < __ACTIONS_MAX; i++) {
+                if (!args.actions[i]) {
+                        continue;
                 }
-
-                struct cJSON *at_resp = at_execute(&at_port, a->at_cmd, strlen(a->at_cmd));
+                struct action *action = &modem.actions[i];
+                if (action->at_cmd == NULL || strnlen(action->at_cmd, AT_CMD_MAX) == 0 || action->parser == NULL) {
+                        printf("Unsupported action\n"); // TODO: json response
+                        continue;
+                }
+                struct cJSON *at_resp = at_execute(&at_port, action->at_cmd, strlen(action->at_cmd));
                 if (at_resp == NULL) {
                 }
                 struct cJSON *parser_resp = NULL;
-                a->parser(at_resp, &parser_resp);
+                action->parser(at_resp, &parser_resp);
                 if (args.debug) {
                         cJSON_AddItemToArray(responses, at_resp);
                 } else {
                         cJSON_Delete(at_resp);
                 }
                 cJSON_AddItemToArray(responses, parser_resp);
-                a = &modem.actions[GET_STATUS];
-                if (a == NULL) {
-                        printf("No get status");
-                }
         }
 
         if (args.json) {

@@ -11,18 +11,25 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state);
 static char doc[] = "Modemctl - command line tool to control modems";
 static char args_doc[] = "";
 static struct argp_option options[] = {
-        { "imei", 'i', 0, 0, "Get IMEI", 0 },
-        { "device", 'd', "PATH_TO_DEVICE", 0, "Set AT command port", 0 },
-        { "debug", 'g', 0, 0, "Turn on debug mode", 0 },
-        { "json", 'j', 0, 0, "Turn on json output", 0},
-        { "at", 'a', "AT_COMMAND", 0, "Execute AT command", 0},
-        // { "status", 'u', 0, 0, "Get modem status", 0 },
-        // { "all", 'a', 0, 0, "get all", 0},
-        // { "operator", 'o', 0 ,0, "Get operator", 0 },
-        // { "signal", 's', 0, 0, "Get signal level", 0 },
-        // { "cell", 'c', 0, 0, "Get cell", 0 },
-        // { "band", 'b', 0, 0, "Get band", 0 },
-        // { "watch", 'w', 0, 0, "keep watching", 0 },
+        { "device", DEVICE_KEY, "PATH_TO_DEVICE", 0, "Set AT command port", 0 },
+        { "debug", DEBUG_KEY, 0, 0, "Turn on debug mode", 0 },
+        { "json", JSON_KEY, 0, 0, "Turn on json output", 0},
+        { "at", AT_KEY, "AT_COMMAND", 0, "Execute AT command", 0},
+        { "all", ALL_KEY, 0, 0, "get all", 0},
+        { "watch", WATCH_KEY, 0, 0, "keep watching", 0 },
+        { "imei", IMEI_KEY, 0, 0, "Get IMEI", 0 },
+        { "model", MODEL_KEY, 0, 0, "Get modem model", 0 },
+        { "operator", OPERATOR_KEY, 0 ,0, "Get operator", 0 },
+        { "connection", CONNECTION_KEY, 0, 0, "Get connection status", 0 },
+        { "band", BAND_KEY, 0, 0, "Get current band", 0 },
+        { "sim", SIM_KEY, 0, 0, "Get sim status", 0 },
+        { "serving-cell", SERVING_CELL_KEY, 0, 0, "Get current serving cell", 0 },
+        { "neighbour-cells", NEIGHBOUR_CELLS_KEY, 0, 0, "Get neighbour cells", 0 },
+        { "signal", SIGNAL_KEY, 0, 0, "Get signal level", 0 },
+        { "ip", IP_KEY, 0, 0, "Get ip address", 0 },
+        { "apn", APN_KEY, 0, 0, "Get current APN", 0 },
+        { "number", NUMBER_KEY, 0, 0, "Get phone number", 0 },
+        { "sms", SMS_KEY, 0, 0, "Get SMS", 0 },
         { 0 },
 };
 static struct argp argp = { options, parse_opt, args_doc, doc, NULL, NULL, NULL };
@@ -33,28 +40,65 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 {
         struct arguments *arguments = state->input;
         switch (key) {
-        case 'd':
+        case DEVICE_KEY:
                 strncpy(arguments->device, arg, PATH_MAX);
                 arguments->device[PATH_MAX - 1] = '\0';
                 break;
-        case 'i':
-                arguments->imei = true;
-                break;
-        case 'u':
-                arguments->status = true;
-                break;
-        case 'g':
+        case DEBUG_KEY:
                 arguments->debug = true;
                 break;
-        case 'j':
+        case JSON_KEY:
                 arguments->json = true;
                 break;
-        case 'a':
+        case AT_KEY:
                 if (arguments->at_cmds == NULL) {
                         arguments->at_cmds = cJSON_CreateArray();
                 }
                 struct cJSON *string_json = cJSON_CreateString(arg);
                 cJSON_AddItemToArray(arguments->at_cmds, string_json);
+                break;
+        case WATCH_KEY:
+                return ARGP_ERR_UNKNOWN; //TODO make --watch option
+        case ALL_KEY:
+                for (int i = 0; i < __ACTIONS_MAX; i++) {
+                        arguments->actions[i] = true;
+                }
+                break;
+        case IMEI_KEY:
+                arguments->actions[GET_IMEI] = true;
+                break;
+        case MODEL_KEY:
+                arguments->actions[GET_MODEL] = true;
+                break;
+        case OPERATOR_KEY:
+                arguments->actions[GET_OPERATOR] = true;
+                break;
+        case CONNECTION_KEY:
+                arguments->actions[GET_CONNECTION_STATUS] = true;
+                break;
+        case SIM_KEY:
+                arguments->actions[GET_SIM_STATUS] = true;
+                break;
+        case SERVING_CELL_KEY:
+                arguments->actions[GET_SERVING_CELL] = true;
+                break;
+        case NEIGHBOUR_CELLS_KEY:
+                arguments->actions[GET_NEIGHBOUR_CELL] = true;
+                break;
+        case SIGNAL_KEY:
+                arguments->actions[GET_SIGNAL] = true;
+                break;
+        case IP_KEY:
+                arguments->actions[GET_IP_ADDRESS] = true;
+                break;
+        case APN_KEY:
+                arguments->actions[GET_CURRENT_APN] = true;
+                break;
+        case NUMBER_KEY:
+                arguments->actions[GET_PHONE_NUMBER] = true;
+                break;
+        case SMS_KEY:
+                arguments->actions[GET_SMS] = true;
                 break;
         case ARGP_KEY_ARG:
                 if (state->arg_num > 0)
