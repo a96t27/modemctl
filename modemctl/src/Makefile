@@ -1,29 +1,27 @@
 CFLAGS += -Wall -Wextra -pedantic
 CPPFLAGS += -I./include
-LDFLAGS += -largp -lcjson
-BIN = bin/modemctl
-BUILD_DIR := build
-SRCS = $(wildcard src/*.c)
-OBJS = $(SRCS:src/%.c=bin/%.o)
+LDLIBS += -largp -lcjson
 
-.PHONY: clean all objects run
+BIN := bin/modemctl
+BUILD_DIR := build
+
+SRCS := $(shell find src -name '*.c')
+OBJS := $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(SRCS))
+
+.PHONY: all clean run
 
 all: $(BIN)
 
-
 $(BIN): $(OBJS)
-	$(CC) -o $@ $^ $(LDFLAGS) $(CFLAGS)
+	mkdir -p $(dir $@)
+	$(CC) $^ -o $@ $(LDLIBS)
 
-build: $(BIN)
-
-objects: $(OBJS)
-
-bin/%.o: src/%.c
-	mkdir -p bin/
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -c -o $@ $^
+$(BUILD_DIR)/%.o: src/%.c
+	mkdir -p $(dir $@)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 clean:
-	${RM} $(BIN) $(OBJS)
+	$(RM) -r $(BUILD_DIR) $(BIN)
 
-run: build
-	$(BIN)
+run: all
+	./$(BIN)

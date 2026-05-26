@@ -35,6 +35,9 @@
 ## Programos vykdymas
 
 nuskaityti cli parametrus ->
+jeigu irenginis nenurodytas ->
+nustatyti irenginio modeli ->
+pagal modeli gauti callback funkcijas ->
 atidaryti sasajos deskriptorių ir nustatyti jo parametrus (koks timeout, koks boud speed ir t.t.) ->
 išsaugoti dabartinius modemo nustatymus ->
 pakeisti modemo nustatymus programos veikimui (pvz.: AT+CMEE=2, ATV1 ir pan.) ->
