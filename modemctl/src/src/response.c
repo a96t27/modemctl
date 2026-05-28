@@ -62,11 +62,12 @@ bool is_at_response(struct cJSON *resp)
         if (!is_valid_response(resp)) {
                 return false;
         }
-        char *type = cJSON_GetStringValue(cJSON_GetObjectItem(resp, "type"));
+        char *type = get_response_type(resp);
+        struct cJSON *at_data = get_response_data(resp);
+
         if (strcmp(type, "at") != 0) {
                 return false;
         }
-        struct cJSON *at_data = cJSON_GetObjectItemCaseSensitive(resp, "data");
         if (at_data == NULL) {
                 return false;
         }
@@ -79,4 +80,58 @@ bool is_at_response(struct cJSON *resp)
                 return false;
         }
         return true;
+}
+
+char *get_response_type(struct cJSON *resp)
+{
+        if (!cJSON_IsObject(resp)) {
+                return NULL;
+        }
+        struct cJSON *item = cJSON_GetObjectItemCaseSensitive(resp, "type");
+        if (!cJSON_IsString(item)) {
+                return NULL;
+        }
+        return cJSON_GetStringValue(item);
+}
+
+char *get_response_message(struct cJSON *resp)
+{
+        if (!cJSON_IsObject(resp)) {
+                return NULL;
+        }
+        struct cJSON *item = cJSON_GetObjectItemCaseSensitive(resp, "message");
+        if (!cJSON_IsString(item)) {
+                return NULL;
+        }
+        return cJSON_GetStringValue(item);
+}
+
+bool get_response_success(struct cJSON *resp)
+{
+        if (!cJSON_IsObject(resp)) {
+                return false;
+        }
+        struct cJSON *item = cJSON_GetObjectItemCaseSensitive(resp, "success");
+        if (!cJSON_IsBool(item)) {
+                return false;
+        }
+        return cJSON_IsTrue(item);
+}
+
+struct cJSON *get_response_data(struct cJSON *resp)
+{
+        if (!cJSON_IsObject(resp)) {
+                return false;
+        }
+        struct cJSON *item = cJSON_GetObjectItemCaseSensitive(resp, "data");
+        if (!cJSON_IsObject(item)) {
+                return NULL;
+        }
+        return item;
+}
+
+struct cJSON *create_execution_error_response(const char *message, size_t message_len)
+{
+        char type[] = "execution";
+        return create_response(false, type, sizeof(type) - 1, message, message_len, NULL);
 }

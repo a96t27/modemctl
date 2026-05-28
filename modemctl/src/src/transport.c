@@ -106,7 +106,6 @@ int get_at_port(const char *dev_path, size_t dev_path_len, struct at_port *resul
 
 bool is_supported_device(const struct usb_info *usb_info)
 {
-        // TODO: should support more models
         if (usb_info == NULL) {
                 return false;
         }
@@ -188,7 +187,7 @@ struct cJSON *at_execute(struct at_port *port, const char *cmd, size_t cmd_len) 
         }
         struct cJSON *result = cJSON_CreateArray();
         if (result == NULL) {
-
+                return NULL;
         }
         tcflush(port->fd, TCIFLUSH);
         write(port->fd, cmd, cmd_len);

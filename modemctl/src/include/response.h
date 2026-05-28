@@ -9,5 +9,10 @@
 struct cJSON *create_response(bool success, const char *type, size_t type_len, const char *message, size_t message_len, struct cJSON *data);
 bool is_valid_response(struct cJSON *resp);
 bool is_at_response(struct cJSON *resp);
+char *get_response_type(struct cJSON *resp);
+bool get_response_success(struct cJSON *resp);
+struct cJSON *get_response_data(struct cJSON *resp);
+char *get_response_message(struct cJSON *resp);
+struct cJSON *create_execution_error_response(const char *message, size_t message_len);
 
 #endif

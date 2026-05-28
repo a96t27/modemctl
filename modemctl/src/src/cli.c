@@ -30,11 +30,10 @@ static struct argp_option options[] = {
         { "apn", APN_KEY, 0, 0, "Get current APN", 0 },
         { "number", NUMBER_KEY, 0, 0, "Get phone number", 0 },
         { "sms", SMS_KEY, 0, 0, "Get SMS", 0 },
+        { "temperature", TEMPERATURE_KEY, 0, 0, "Get temperature", 0 },
         { 0 },
 };
 static struct argp argp = { options, parse_opt, args_doc, doc, NULL, NULL, NULL };
-
-
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state)
 {
@@ -76,6 +75,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
         case CONNECTION_KEY:
                 arguments->actions[GET_CONNECTION_STATUS] = true;
                 break;
+        case BAND_KEY:
+                arguments->actions[GET_BAND] = true;
+                break;
         case SIM_KEY:
                 arguments->actions[GET_SIM_STATUS] = true;
                 break;
@@ -99,6 +101,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
                 break;
         case SMS_KEY:
                 arguments->actions[GET_SMS] = true;
+                break;
+        case TEMPERATURE_KEY:
+                arguments->actions[GET_TEMPERATURE] = true;
                 break;
         case ARGP_KEY_ARG:
                 if (state->arg_num > 0)
@@ -131,7 +136,7 @@ int print_at_resp(struct cJSON *at_resp)
         struct cJSON *data = cJSON_GetObjectItemCaseSensitive(at_resp, "data");
         struct cJSON *item = cJSON_GetObjectItemCaseSensitive(data, "command");
         char *txt = cJSON_GetStringValue(item);
-        printf("\n< %s\n", txt);
+        printf("\n< %s\n\n", txt);
         item = cJSON_GetObjectItemCaseSensitive(data, "result");
         struct cJSON *line = NULL;
         cJSON_ArrayForEach(line, item)

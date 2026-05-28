@@ -8,11 +8,11 @@
 #include <transport.h>
 #include <inttypes.h>
 
-#define AT_CMD_MAX 128
-
+#define LF "\n"
+#define CR "\r"
+#define CRLF "\r\n"
 
 enum action_code {
-        NO_ACTION,
         GET_IMEI,
         GET_MODEL,
         GET_OPERATOR,
@@ -32,7 +32,7 @@ enum action_code {
 
 struct action {
         int (*parser) (struct cJSON *at_output, struct cJSON **resp);
-        char at_cmd[AT_CMD_MAX];
+        const char *at_cmd;
 };
 
 struct modem {

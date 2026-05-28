@@ -16,7 +16,7 @@
 | AT+QENG="neighbourcell" | Gretimas celes (neighbor cells);                       | Skirtingi formatai LTE ir WCDMA režimui                                                                                       |
 |         AT+CSQ          | Signalo stiprumą;                                      | +CSQ: <rssi>,<ber> rssi: 0-31 rysio stiprumas, 99 - nezinomas stiprumas                                                       |
 |            ?            | IP adresą (jei yra aktyvi duomenų sesija);             |                                                                                                                               |
-|            ?            | Modemo temperatūrą (jei palaikoma);                    |                                                                                                                               |
+|        AT+QTEMP         | Modemo temperatūrą (jei palaikoma);                    |                                                                                                                               |
 |            ?            | Naudojamą APN;                                         |                                                                                                                               |
 |         AT+CNUM         | Telefono numerį (jei prieinamas);                      |                                                                                                                               |
 |         AT+CMGL         | SMS žinutes (sudėtingesnė dalis – multi-line parsing). |                                                                                                                               |

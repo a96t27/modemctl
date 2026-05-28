@@ -71,55 +71,84 @@ int main(int argc, char **argv)
 
         int device_len = strnlen(args.device, PATH_MAX);
         struct at_port at_port = { 0 };
+
+        struct cJSON *responses = cJSON_CreateArray();
+
         if (device_len > 0) {
                 if (get_at_port(args.device, device_len, &at_port) != EXIT_SUCCESS) {
-                        printf("Unsupported device\n");
+                        char err[] = "Unsupported device";
+                        cJSON_AddItemToArray(responses, create_execution_error_response(err, sizeof(err) - 1));
                         ret = EXIT_FAILURE;
                         goto err_failed_to_open_file;
                 }
         } else {
                 if (find_any_at_port(&at_port) != EXIT_SUCCESS) {
-                        printf("Failed to open device\n");
+                        char err[] = "Failed to find an AT port";
+                        cJSON_AddItemToArray(responses, create_execution_error_response(err, sizeof(err) - 1));
                         ret = EXIT_FAILURE;
                         goto err_failed_to_open_file;
                 }
         }
-        setup_at_port(&at_port);
+
+        if (setup_at_port(&at_port) != EXIT_SUCCESS) {
+                char err[] = "Failed to setup the AT port";
+                cJSON_AddItemToArray(responses, create_execution_error_response(err, sizeof(err) - 1));
+                ret = EXIT_FAILURE;
+                goto err_failed_to_open_file;
+        }
 
 
-        struct cJSON *responses = cJSON_CreateArray();
 
         if (args.at_cmds != NULL) {
                 if (execute_cmds(&at_port, args.at_cmds, responses) != EXIT_SUCCESS) {
-                        printf("Failed to execute commands\n");
+                        char err[] = "Failed to execute AT commands";
+                        cJSON_AddItemToArray(responses, create_execution_error_response(err, sizeof(err) - 1));
                 }
         }
+
         struct modem modem = { 0 };
         if (get_modem(at_port.usb_info.vendor_id, at_port.usb_info.product_id, &modem) != EXIT_SUCCESS) {
-                printf("Failed to find modem\n");
+                char err[] = "Failed to find modem";
+                cJSON_AddItemToArray(responses, create_execution_error_response(err, sizeof(err) - 1));
+                goto err_failed_to_open_file;
         }
+
         for (int i = 0; i < __ACTIONS_MAX; i++) {
                 if (!args.actions[i]) {
                         continue;
                 }
                 struct action *action = &modem.actions[i];
-                if (action->at_cmd == NULL || strnlen(action->at_cmd, AT_CMD_MAX) == 0 || action->parser == NULL) {
-                        printf("Unsupported action\n"); // TODO: json response
+                if (action->at_cmd == NULL || action->parser == NULL || strlen(action->at_cmd) == 0) {
+                        char err[] = "Unsupported action";
+                        cJSON_AddItemToArray(responses, create_execution_error_response(err, sizeof(err) - 1));
                         continue;
                 }
                 struct cJSON *at_resp = at_execute(&at_port, action->at_cmd, strlen(action->at_cmd));
                 if (at_resp == NULL) {
+                        char err[] = "Failed to execute an action";
+                        cJSON_AddItemToArray(responses, create_execution_error_response(err, sizeof(err) - 1));
+                        continue;
                 }
-                struct cJSON *parser_resp = NULL;
-                action->parser(at_resp, &parser_resp);
+
                 if (args.debug) {
                         cJSON_AddItemToArray(responses, at_resp);
+                }
+
+                struct cJSON *parser_resp = NULL;
+                if (action->parser(at_resp, &parser_resp) == EXIT_SUCCESS) {
+                        cJSON_AddItemToArray(responses, parser_resp);
                 } else {
+                        char err[] = "Failed to AT response";
+                        cJSON_AddItemToArray(responses, create_execution_error_response(err, sizeof(err) - 1));
+                        cJSON_Delete(parser_resp);
+                }
+
+                if (!args.debug) {
                         cJSON_Delete(at_resp);
                 }
-                cJSON_AddItemToArray(responses, parser_resp);
         }
 
+err_failed_to_open_file:
         if (args.json) {
                 char *txt = cJSON_Print(responses);
                 printf("%s\n", txt);
@@ -129,7 +158,6 @@ int main(int argc, char **argv)
         }
         cJSON_Delete(responses);
         close(at_port.fd);
-err_failed_to_open_file:
 err_failed_argp:
         if (args.at_cmds) {
                 cJSON_Delete(args.at_cmds);

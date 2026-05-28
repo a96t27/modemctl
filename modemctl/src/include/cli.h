@@ -35,6 +35,7 @@ enum {
         IP_KEY,
         APN_KEY,
         NUMBER_KEY,
+        TEMPERATURE_KEY,
         SMS_KEY,
 };
 
