@@ -18,7 +18,7 @@
 |            ?            | IP adresą (jei yra aktyvi duomenų sesija);             |                                                                                                                               |
 |        AT+QTEMP         | Modemo temperatūrą (jei palaikoma);                    |                                                                                                                               |
 |            ?            | Naudojamą APN;                                         |                                                                                                                               |
-|         AT+CNUM         | Telefono numerį (jei prieinamas);                      |                                                                                                                               |
+|       ??? AT+CNUM       | Telefono numerį (jei prieinamas);                      |                                                                                                                               |
 |         AT+CMGL         | SMS žinutes (sudėtingesnė dalis – multi-line parsing). |                                                                                                                               |
 
 ## Komandos išvedimo nustatymui

@@ -674,7 +674,6 @@ static int quectel_eg06_parse_apn(struct cJSON *at_resp, struct cJSON **resp)
         struct cJSON *apns = cJSON_CreateArray();
         cJSON_AddItemToObject(data, "apns", apns);
 
-
         char msg_buf[RESPONSE_BUFFER_SIZE] = { 0 };
         char msg_len = 0;
         bool first = true;
@@ -714,6 +713,58 @@ static int quectel_eg06_parse_apn(struct cJSON *at_resp, struct cJSON **resp)
         if (success) {
                 type = "model";
         } else { // TODO: +CME ERROR here
+                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Failed to get APN");
+                type = "error";
+                cJSON_Delete(data);
+                data = NULL;
+        }
+        *resp = create_response(success, type, strlen(type), msg_buf, msg_len, data);
+        return EXIT_SUCCESS;
+}
+
+static int quectel_eg06_parse_serving_cell(struct cJSON *at_resp, struct cJSON **resp)
+{
+        if (!is_at_response(at_resp)) {
+                return EXIT_FAILURE;
+        }
+        struct cJSON *at_data = get_response_data(at_resp);
+        struct cJSON *at_result = cJSON_GetObjectItemCaseSensitive(at_data, "result");
+        struct cJSON *data = cJSON_CreateObject();
+        struct cJSON *item = NULL;
+        bool success = true;
+
+        char state[16] = { 0 };
+        char generation[16] = { 0 };
+        uint64_t cell_id = 0;
+
+        cJSON_ArrayForEach(item, at_result)
+        {
+                if (!cJSON_IsString(item)) {
+                        continue;
+                }
+                char *line = cJSON_GetStringValue(item);
+                size_t len = strlen(line);
+                if (is_ok(line, len)) {
+                        break;
+                }
+                if (is_error(line, len)) {
+                        success = false;
+                        break;
+                }
+                sscanf(line, "+QENG: \"servingcell\",\"%12[^\"]\",\"%12[^\"]\",%*[^,],%*[^,],%*[^,],%llx", state, generation, &cell_id);
+        }
+
+        char msg_buf[RESPONSE_BUFFER_SIZE] = { 0 };
+        char msg_len = 0;
+        msg_len = snprintf(msg_buf, sizeof(msg_buf), "Serving Cell: %s %s (cell_id:%llx)", generation, state, cell_id);
+        const char *type = NULL;
+
+        if (success) {
+                type = "model";
+                cJSON_AddStringToObject(data, "generation", generation);
+                cJSON_AddStringToObject(data, "state", state);
+                cJSON_AddNumberToObject(data, "cell_id", cell_id);
+        } else {
                 msg_len = snprintf(msg_buf, sizeof(msg_buf), "Failed to get band");
                 type = "error";
                 cJSON_Delete(data);
@@ -723,7 +774,56 @@ static int quectel_eg06_parse_apn(struct cJSON *at_resp, struct cJSON **resp)
         return EXIT_SUCCESS;
 }
 
+static int quectel_eg06_parse_neighbour_cells(struct cJSON *at_resp, struct cJSON **resp)
+{
+        if (!is_at_response(at_resp)) {
+                return EXIT_FAILURE;
+        }
+        struct cJSON *at_data = get_response_data(at_resp);
+        struct cJSON *at_result = cJSON_GetObjectItemCaseSensitive(at_data, "result");
+        struct cJSON *data = cJSON_CreateObject();
+        struct cJSON *item = NULL;
+        bool success = true;
 
+        int count = 0;
+        char beginning[] = "+QENG: \"neighbourcell";
+
+        cJSON_ArrayForEach(item, at_result)
+        {
+                if (!cJSON_IsString(item)) {
+                        continue;
+                }
+                char *line = cJSON_GetStringValue(item);
+                size_t len = strlen(line);
+                if (is_ok(line, len)) {
+                        break;
+                }
+                if (is_error(line, len)) {
+                        success = false;
+                        break;
+                }
+                if (strncmp(beginning, line, sizeof(beginning) - 1) == 0) {
+                        count++;
+                }
+        }
+
+        char msg_buf[RESPONSE_BUFFER_SIZE] = { 0 };
+        char msg_len = 0;
+        msg_len = snprintf(msg_buf, sizeof(msg_buf), "Neighbour cells: found %d", count);
+        const char *type = NULL;
+
+        if (success) {
+                type = "neighbourcell";
+                cJSON_AddNumberToObject(data, "count", count);
+        } else {
+                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Failed to get serving cell");
+                type = "error";
+                cJSON_Delete(data);
+                data = NULL;
+        }
+        *resp = create_response(success, type, strlen(type), msg_buf, msg_len, data);
+        return EXIT_SUCCESS;
+}
 
 struct modem quectel_eg06 = {
         .vendor_id = 0x2C7C,
@@ -764,6 +864,14 @@ struct modem quectel_eg06 = {
                 [GET_CURRENT_APN] = {
                         .parser = quectel_eg06_parse_apn,
                         .at_cmd = "AT+CGDCONT?"
-                }
+                },
+                [GET_SERVING_CELL] = {
+                        .parser = quectel_eg06_parse_serving_cell,
+                        .at_cmd = "AT+QENG=\"servingcell\"",
+                },
+                [GET_NEIGHBOUR_CELL] = {
+                        .parser = quectel_eg06_parse_neighbour_cells,
+                        .at_cmd = "AT+QENG=\"neighbourcell\"",
+                },
         },
 };
