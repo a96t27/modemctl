@@ -774,6 +774,12 @@ static int quectel_eg06_parse_serving_cell(struct cJSON *at_resp, struct cJSON *
         return EXIT_SUCCESS;
 }
 
+enum qeng_mode {
+        QENG_UNKNOWN,
+        QENG_LTE,
+        QENG_WCDMA,
+};
+
 static int quectel_eg06_parse_neighbour_cells(struct cJSON *at_resp, struct cJSON **resp)
 {
         if (!is_at_response(at_resp)) {
@@ -785,8 +791,27 @@ static int quectel_eg06_parse_neighbour_cells(struct cJSON *at_resp, struct cJSO
         struct cJSON *item = NULL;
         bool success = true;
 
-        int count = 0;
-        char beginning[] = "+QENG: \"neighbourcell";
+        char msg_buf[RESPONSE_BUFFER_SIZE] = { 0 };
+        size_t msg_len = 0;
+
+        char beginning[] = "Neighbour cells:\n";
+        strncpy(msg_buf, beginning, sizeof(msg_buf));
+        msg_len += sizeof(beginning) - 1;
+
+        enum qeng_mode mode = QENG_UNKNOWN;
+        char mode_buf[8] = { 0 };
+        const char lte[] = "LTE";
+        const char wcdma[] = "WCDMA";
+
+        char cell_type[8];
+        char id[16];
+
+        struct cJSON *cells = cJSON_CreateArray();
+        cJSON_AddItemToObject(data, "cells", cells);
+        struct cJSON *cell = NULL;
+
+        char buf[128] = { 0 };
+        size_t buf_len = 0;
 
         cJSON_ArrayForEach(item, at_result)
         {
@@ -802,19 +827,28 @@ static int quectel_eg06_parse_neighbour_cells(struct cJSON *at_resp, struct cJSO
                         success = false;
                         break;
                 }
-                if (strncmp(beginning, line, sizeof(beginning) - 1) == 0) {
-                        count++;
+                if (mode == QENG_UNKNOWN && sscanf(line, "+QENG: \"servingcell\",%*[^,],\"%7[^\"]", mode_buf) == 1) {
+                        if (strncmp(mode_buf, lte, sizeof(lte) - 1) == 0) {
+                                mode = QENG_LTE;
+                        } else if (strncmp(mode_buf, wcdma, sizeof(wcdma) - 1) == 0) {
+                                mode = QENG_WCDMA;
+                        }
+                } else if (sscanf(line, "+QENG: \"neighbourcell%*[^\"]\",\"%7[^\"]\",%*[^,],%15[^,],", cell_type, id) == 2) {
+                        cell = cJSON_CreateObject();
+                        cJSON_AddItemToArray(cells, cell);
+                        cJSON_AddStringToObject(cell, "cell_type", cell_type);
+                        cJSON_AddStringToObject(cell, "id", id);
+                        buf_len = snprintf(buf, sizeof(buf), "\t- type: %s, id: %s\n", cell_type, id);
+                        strncat(msg_buf + msg_len, buf, sizeof(msg_buf) - msg_len);
+                        msg_len += buf_len;
+
                 }
         }
-
-        char msg_buf[RESPONSE_BUFFER_SIZE] = { 0 };
-        char msg_len = 0;
-        msg_len = snprintf(msg_buf, sizeof(msg_buf), "Neighbour cells: found %d", count);
+        msg_buf[msg_len - 1] = '\0';
         const char *type = NULL;
 
         if (success) {
                 type = "neighbourcell";
-                cJSON_AddNumberToObject(data, "count", count);
         } else {
                 msg_len = snprintf(msg_buf, sizeof(msg_buf), "Failed to get serving cell");
                 type = "error";
@@ -871,7 +905,7 @@ struct modem quectel_eg06 = {
                 },
                 [GET_NEIGHBOUR_CELL] = {
                         .parser = quectel_eg06_parse_neighbour_cells,
-                        .at_cmd = "AT+QENG=\"neighbourcell\"",
+                        .at_cmd = "AT+QENG=\"servingcell\";+QENG=\"neighbourcell\"",
                 },
         },
 };
