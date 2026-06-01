@@ -15,11 +15,12 @@
 |  AT+QENG="servingcell"  | Aptarnaujančios celės (serving cell) informaciją;      | Skirtingi formatai LTE ir WCDMA režimui                                                                                       |
 | AT+QENG="neighbourcell" | Gretimas celes (neighbor cells);                       | Skirtingi formatai LTE ir WCDMA režimui                                                                                       |
 |         AT+CSQ          | Signalo stiprumą;                                      | +CSQ: <rssi>,<ber> rssi: 0-31 rysio stiprumas, 99 - nezinomas stiprumas                                                       |
-|            ?            | IP adresą (jei yra aktyvi duomenų sesija);             |                                                                                                                               |
+|       AT+CGPADDR        | IP adresą (jei yra aktyvi duomenų sesija);             |                                                                                                                               |
 |        AT+QTEMP         | Modemo temperatūrą (jei palaikoma);                    |                                                                                                                               |
-|            ?            | Naudojamą APN;                                         |                                                                                                                               |
+|      AT+CGCONTRDP       | Naudojamą APN;                                         |                                                                                                                               |
 |       ??? AT+CNUM       | Telefono numerį (jei prieinamas);                      |                                                                                                                               |
-|         AT+CMGL         | SMS žinutes (sudėtingesnė dalis – multi-line parsing). |                                                                                                                               |
+|    AT+CMGF=0;+CMGL=1    | SMS žinutes (sudėtingesnė dalis – multi-line parsing). | Jeigu cmgf=1 nėra žinomas žinutės ilgis, todėl nėra patikima. Reikia pačiam dekoduoti žinutę.                                 |
+|                         |                                                        | +CMGL: <index>,<stat>,<alpha>,<length><CR><LF><pdu><CR><LF>                                                                   |
 
 ## Komandos išvedimo nustatymui
 

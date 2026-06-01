@@ -838,7 +838,7 @@ static int quectel_eg06_parse_neighbour_cells(struct cJSON *at_resp, struct cJSO
                         cJSON_AddItemToArray(cells, cell);
                         cJSON_AddStringToObject(cell, "cell_type", cell_type);
                         cJSON_AddStringToObject(cell, "id", id);
-                        buf_len = snprintf(buf, sizeof(buf), "\t- type: %s, id: %s\n", cell_type, id);
+                        buf_len = snprintf(buf, sizeof(buf), "  - type: %s, id: %s\n", cell_type, id);
                         strncat(msg_buf + msg_len, buf, sizeof(msg_buf) - msg_len);
                         msg_len += buf_len;
 
@@ -849,6 +849,83 @@ static int quectel_eg06_parse_neighbour_cells(struct cJSON *at_resp, struct cJSO
 
         if (success) {
                 type = "neighbourcell";
+        } else {
+                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Failed to get serving cell");
+                type = "error";
+                cJSON_Delete(data);
+                data = NULL;
+        }
+        *resp = create_response(success, type, strlen(type), msg_buf, msg_len, data);
+        return EXIT_SUCCESS;
+}
+
+char *pdu_stat[] = {
+        "Received unread messages",
+        "Received read messages",
+        "Stored unsent messages",
+        "Stored sent messages",
+        "All messages",
+};
+
+static int quectel_eg06_parse_sms(struct cJSON *at_resp, struct cJSON **resp)
+{
+        if (!is_at_response(at_resp)) {
+                return EXIT_FAILURE;
+        }
+        struct cJSON *at_data = get_response_data(at_resp);
+        struct cJSON *at_result = cJSON_GetObjectItemCaseSensitive(at_data, "result");
+        struct cJSON *data = cJSON_CreateObject();
+        struct cJSON *item = NULL;
+        bool success = true;
+
+        char msg_buf[RESPONSE_BUFFER_SIZE] = { 0 };
+        size_t msg_len = 0;
+
+        char beginning[] = "SMS:\n";
+        strncpy(msg_buf, beginning, sizeof(msg_buf));
+        msg_len += sizeof(beginning) - 1;
+
+        struct cJSON *msgs = cJSON_CreateArray();
+        cJSON_AddItemToObject(data, "msgs", msgs);
+        struct cJSON *sms = NULL;
+
+        char buf[128] = { 0 };
+        size_t buf_len = 0;
+
+        int index = 0;
+        int stat = 0;
+        int length = 0;
+
+        cJSON_ArrayForEach(item, at_result)
+        {
+                if (!cJSON_IsString(item)) {
+                        continue;
+                }
+                char *line = cJSON_GetStringValue(item);
+                size_t len = strlen(line);
+                if (is_ok(line, len)) {
+                        break;
+                }
+                if (is_error(line, len)) {
+                        success = false;
+                        break;
+                }
+                if (sscanf(line, "+CMGL: %d,%d,,%d", &index, &stat, &length) == 3) { // <alpha> may occur
+                        sms = cJSON_CreateObject();
+                        cJSON_AddItemToArray(msgs, sms);
+                        cJSON_AddNumberToObject(sms, "index", index);
+                        cJSON_AddStringToObject(sms, "stat", pdu_stat[stat]);
+                        cJSON_AddNumberToObject(sms, "length", length);
+                        buf_len = snprintf(msg_buf + msg_len, sizeof(msg_buf) - msg_len, "  -index: %d, stat: %s, length: %d\n", index, pdu_stat[stat], length);
+                        msg_len += buf_len;
+                }  // TODO: message parsing
+        }
+
+        msg_buf[msg_len - 1] = '\0';
+        const char *type = NULL;
+
+        if (success) {
+                type = "sms";
         } else {
                 msg_len = snprintf(msg_buf, sizeof(msg_buf), "Failed to get serving cell");
                 type = "error";
@@ -906,6 +983,10 @@ struct modem quectel_eg06 = {
                 [GET_NEIGHBOUR_CELL] = {
                         .parser = quectel_eg06_parse_neighbour_cells,
                         .at_cmd = "AT+QENG=\"servingcell\";+QENG=\"neighbourcell\"",
+                },
+                [GET_SMS] = {
+                        .parser = quectel_eg06_parse_sms,
+                        .at_cmd = "AT+CMGF=0;+CMGL=1",
                 },
         },
 };
