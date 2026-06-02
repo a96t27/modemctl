@@ -166,7 +166,6 @@ static int quectel_eg06_parse_operator(struct cJSON *at_resp, struct cJSON **res
         }
         struct cJSON *at_data = get_response_data(at_resp);
         struct cJSON *at_result = cJSON_GetObjectItemCaseSensitive(at_data, "result");
-        struct cJSON *at_command = cJSON_GetObjectItemCaseSensitive(at_data, "command");
         struct cJSON *data = cJSON_CreateObject();
         struct cJSON *item = NULL;
         bool success = false;
@@ -236,7 +235,6 @@ static int quectel_eg06_parse_connection_status(struct cJSON *at_resp, struct cJ
         }
         struct cJSON *at_data = get_response_data(at_resp);
         struct cJSON *at_result = cJSON_GetObjectItemCaseSensitive(at_data, "result");
-        struct cJSON *at_command = cJSON_GetObjectItemCaseSensitive(at_data, "command");
         struct cJSON *data = cJSON_CreateObject();
         struct cJSON *item = NULL;
         bool success = true;
@@ -260,7 +258,7 @@ static int quectel_eg06_parse_connection_status(struct cJSON *at_resp, struct cJ
                 }
         }
         char type[] = "connection_status";
-        if (connection_status < 0 || connection_status > sizeof(connection_status)) {
+        if (connection_status < 0 || connection_status >(int)sizeof(connection_status)) {
                 success = false;
         }
 
@@ -370,7 +368,6 @@ static int quectel_eg06_parse_band(struct cJSON *at_resp, struct cJSON **resp)
         }
         struct cJSON *at_data = get_response_data(at_resp);
         struct cJSON *at_result = cJSON_GetObjectItemCaseSensitive(at_data, "result");
-        struct cJSON *at_command = cJSON_GetObjectItemCaseSensitive(at_data, "command");
         struct cJSON *data = cJSON_CreateObject();
         struct cJSON *item = NULL;
         bool success = true;
@@ -399,7 +396,7 @@ static int quectel_eg06_parse_band(struct cJSON *at_resp, struct cJSON **resp)
         cJSON_AddItemToObject(data, "bands", bands_json);
 
 
-        for (int i = 0;i < wcdma_bands_len; i++) {
+        for (int i = 0;i < (int)wcdma_bands_len; i++) {
                 struct band *b = &wcdma_bands[i];
                 if (!(b->mask & bandval)) {
                         continue;
@@ -407,7 +404,7 @@ static int quectel_eg06_parse_band(struct cJSON *at_resp, struct cJSON **resp)
                 cJSON_AddItemToArray(bands_json, cJSON_CreateString(b->name));
         }
 
-        for (int i = 0;i < lte_bands_len; i++) {
+        for (int i = 0;i < (int)lte_bands_len; i++) {
                 struct band *b = &lte_bands[i];
                 if (!(b->mask & ltebandval)) {
                         continue;
@@ -470,7 +467,6 @@ static int quectel_eg06_parse_sim_status(struct cJSON *at_resp, struct cJSON **r
         }
         struct cJSON *at_data = get_response_data(at_resp);
         struct cJSON *at_result = cJSON_GetObjectItemCaseSensitive(at_data, "result");
-        struct cJSON *at_command = cJSON_GetObjectItemCaseSensitive(at_data, "command");
         struct cJSON *data = cJSON_CreateObject();
         struct cJSON *item = NULL;
         bool success = true;
@@ -493,7 +489,7 @@ static int quectel_eg06_parse_sim_status(struct cJSON *at_resp, struct cJSON **r
 
         }
 
-        if (sim_state < 0 || sim_state >= sizeof(sim_state_txt)) {
+        if (sim_state < 0 || sim_state >= (int)sizeof(sim_state_txt)) {
                 success = false;
         }
         char type[] = "sim_state";
@@ -508,6 +504,7 @@ static int quectel_eg06_parse_sim_status(struct cJSON *at_resp, struct cJSON **r
                 data = NULL;
                 *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, NULL);
         }
+        return EXIT_SUCCESS;
 }
 
 static int quectel_eg06_print_sim_status(struct cJSON *parser_output)
@@ -531,7 +528,6 @@ static int quectel_eg06_parse_signal(struct cJSON *at_resp, struct cJSON **resp)
         }
         struct cJSON *at_data = get_response_data(at_resp);
         struct cJSON *at_result = cJSON_GetObjectItemCaseSensitive(at_data, "result");
-        struct cJSON *at_command = cJSON_GetObjectItemCaseSensitive(at_data, "command");
         struct cJSON *data = cJSON_CreateObject();
         struct cJSON *item = NULL;
         bool success = true;
@@ -603,7 +599,6 @@ static int quectel_eg06_parse_temperature(struct cJSON *at_resp, struct cJSON **
         }
         struct cJSON *at_data = get_response_data(at_resp);
         struct cJSON *at_result = cJSON_GetObjectItemCaseSensitive(at_data, "result");
-        struct cJSON *at_command = cJSON_GetObjectItemCaseSensitive(at_data, "command");
         struct cJSON *data = cJSON_CreateObject();
         struct cJSON *item = NULL;
         bool success = true;
@@ -827,9 +822,6 @@ static int quectel_eg06_parse_neighbour_cells(struct cJSON *at_resp, struct cJSO
         struct cJSON *cells = cJSON_CreateArray();
         cJSON_AddItemToObject(data, "cells", cells);
         struct cJSON *cell = NULL;
-
-        char buf[128] = { 0 };
-        size_t buf_len = 0;
 
         cJSON_ArrayForEach(item, at_result)
         {
