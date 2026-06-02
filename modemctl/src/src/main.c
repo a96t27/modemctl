@@ -16,9 +16,9 @@
 #include <response.h>
 #include <parser.h>
 #include <cli.h>
-
 #include <modem.h>
 #include <modem_lookup.h>
+#include <context.h>
 
 int running = 1;
 
@@ -28,9 +28,9 @@ void sig_handler(int sigint)
         running = 0;
 }
 
-int execute_cmds(struct at_port *port, struct cJSON *cmds, struct cJSON *responses)
+int execute_cmds(struct context *ctx, struct cJSON *cmds)
 {
-        if (port == NULL || !cJSON_IsArray(cmds) || !cJSON_IsArray(responses)) {
+        if (!is_valid_context(ctx) || !cJSON_IsArray(cmds)) {
                 return EXIT_FAILURE;
         }
         struct cJSON *cmd = NULL;
@@ -40,14 +40,66 @@ int execute_cmds(struct at_port *port, struct cJSON *cmds, struct cJSON *respons
                         continue;
                 }
                 char *txt = cJSON_GetStringValue(cmd);
-                struct cJSON *resp = at_execute(port, txt, strlen(txt));
+                struct cJSON *resp = at_execute(ctx->port, txt, strlen(txt));
                 if (resp == NULL) {
                         continue; // TODO: reikia generuoti klaida
                 }
-                cJSON_AddItemToArray(responses, resp);
+                if (ctx->json) {
+                        char *txt = cJSON_Print(resp);
+                        printf("%s\n", txt);
+                        free(txt);
+                } else {
+                        print_at_resp(resp);
+                }
+                cJSON_Delete(resp);
         }
         return EXIT_SUCCESS;
 }
+
+int execute_action(struct context *ctx, enum action_code action_code)
+{
+        if (!is_valid_context(ctx) || action_code < 0 || action_code >= __ACTIONS_MAX) {
+                return EXIT_FAILURE;
+        }
+        struct action *action = &ctx->modem->actions[action_code];
+
+        if (!is_action_implemented(action)) {
+                return EXIT_FAILURE;
+        }
+
+        struct cJSON *at_response = at_execute(ctx->port, action->at_cmd, strlen(action->at_cmd));
+        if (at_response == NULL) {
+                return EXIT_FAILURE;
+        }
+
+        if (ctx->debug) {
+                if (ctx->json) {
+                        char *txt = cJSON_Print(at_response);
+                        printf("%s\n", txt);
+                        free(txt);
+                } else {
+                        print_at_resp(at_response);
+                }
+        }
+
+        struct cJSON *parser_resp = NULL;
+        action->parser(at_response, &parser_resp);
+        int ret = EXIT_SUCCESS;
+        if (ctx->json) {
+                char *txt = cJSON_Print(parser_resp);
+                printf("%s\n", txt);
+                free(txt);
+        } else if (action->print_parser_resp(parser_resp) != EXIT_SUCCESS) {
+                printf("Failed to parse\n");
+                ret = EXIT_FAILURE;
+        }
+err_out:
+        cJSON_Delete(parser_resp);
+        cJSON_Delete(at_response);
+
+        return ret;
+}
+#define STR(x) #x
 
 int main(int argc, char **argv)
 {
@@ -72,19 +124,17 @@ int main(int argc, char **argv)
         int device_len = strnlen(args.device, PATH_MAX);
         struct at_port at_port = { 0 };
 
-        struct cJSON *responses = cJSON_CreateArray();
-
         if (device_len > 0) {
                 if (get_at_port(args.device, device_len, &at_port) != EXIT_SUCCESS) {
                         char err[] = "Unsupported device";
-                        cJSON_AddItemToArray(responses, create_execution_error_response(err, sizeof(err) - 1));
+                        printf("%s\n", err); // TODO: json output
                         ret = EXIT_FAILURE;
                         goto err_failed_to_open_file;
                 }
         } else {
                 if (find_any_at_port(&at_port) != EXIT_SUCCESS) {
                         char err[] = "Failed to find an AT port";
-                        cJSON_AddItemToArray(responses, create_execution_error_response(err, sizeof(err) - 1));
+                        printf("%s\n", err); // TODO: json output
                         ret = EXIT_FAILURE;
                         goto err_failed_to_open_file;
                 }
@@ -92,71 +142,49 @@ int main(int argc, char **argv)
 
         if (setup_at_port(&at_port) != EXIT_SUCCESS) {
                 char err[] = "Failed to setup the AT port";
-                cJSON_AddItemToArray(responses, create_execution_error_response(err, sizeof(err) - 1));
+                printf("%s\n", err); // TODO: json output
                 ret = EXIT_FAILURE;
                 goto err_failed_to_open_file;
-        }
-
-
-
-        if (args.at_cmds != NULL) {
-                if (execute_cmds(&at_port, args.at_cmds, responses) != EXIT_SUCCESS) {
-                        char err[] = "Failed to execute AT commands";
-                        cJSON_AddItemToArray(responses, create_execution_error_response(err, sizeof(err) - 1));
-                }
         }
 
         struct modem modem = { 0 };
         if (get_modem(at_port.usb_info.vendor_id, at_port.usb_info.product_id, &modem) != EXIT_SUCCESS) {
                 char err[] = "Failed to find modem";
-                cJSON_AddItemToArray(responses, create_execution_error_response(err, sizeof(err) - 1));
+                printf("%s\n", err); // TODO: json output
                 goto err_failed_to_open_file;
         }
 
-        for (int i = 0; i < __ACTIONS_MAX; i++) {
-                if (!args.actions[i]) {
+        struct context ctx = {
+                .debug = args.debug,
+                .json = args.json,
+                .modem = &modem,
+                .port = &at_port,
+        };
+
+        for (int a = 0; a < __ACTIONS_MAX; a++) {
+                if (!args.actions[a] && !args.all) {
                         continue;
                 }
-                struct action *action = &modem.actions[i];
-                if (action->at_cmd == NULL || action->parser == NULL || strlen(action->at_cmd) == 0) {
-                        char err[] = "Unsupported action";
-                        cJSON_AddItemToArray(responses, create_execution_error_response(err, sizeof(err) - 1));
+                if (args.actions[a] && !is_action_implemented(modem.actions + a)) {
+                        printf("Not implemented\n");
                         continue;
                 }
-                struct cJSON *at_resp = at_execute(&at_port, action->at_cmd, strlen(action->at_cmd));
-                if (at_resp == NULL) {
-                        char err[] = "Failed to execute an action";
-                        cJSON_AddItemToArray(responses, create_execution_error_response(err, sizeof(err) - 1));
+                if (args.all && !is_action_implemented(modem.actions + a)) {
                         continue;
                 }
-
-                if (args.debug) {
-                        cJSON_AddItemToArray(responses, at_resp);
+                if (execute_action(&ctx, a) != EXIT_SUCCESS) {
+                        printf("Failed to execute action\n");
                 }
+        }
 
-                struct cJSON *parser_resp = NULL;
-                if (action->parser(at_resp, &parser_resp) == EXIT_SUCCESS) {
-                        cJSON_AddItemToArray(responses, parser_resp);
-                } else {
-                        char err[] = "Failed to AT response";
-                        cJSON_AddItemToArray(responses, create_execution_error_response(err, sizeof(err) - 1));
-                        cJSON_Delete(parser_resp);
-                }
-
-                if (!args.debug) {
-                        cJSON_Delete(at_resp);
+        if (args.at_cmds != NULL) {
+                if (execute_cmds(&ctx, args.at_cmds) != EXIT_SUCCESS) {
+                        char err[] = "Failed to execute AT commands";
+                        printf("%s\n", err);
                 }
         }
 
 err_failed_to_open_file:
-        if (args.json) {
-                char *txt = cJSON_Print(responses);
-                printf("%s\n", txt);
-                free(txt);
-        } else {
-                print_responses(responses);
-        }
-        cJSON_Delete(responses);
         close(at_port.fd);
 err_failed_argp:
         if (args.at_cmds) {

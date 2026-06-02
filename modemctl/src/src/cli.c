@@ -59,9 +59,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
         case WATCH_KEY:
                 return ARGP_ERR_UNKNOWN; //TODO make --watch option
         case ALL_KEY:
-                for (int i = 0; i < __ACTIONS_MAX; i++) {
-                        arguments->actions[i] = true;
-                }
+                arguments->all = true;
                 break;
         case IMEI_KEY:
                 arguments->actions[GET_IMEI] = true;

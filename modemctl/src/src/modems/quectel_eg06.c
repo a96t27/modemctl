@@ -18,11 +18,13 @@ static int quectel_eg06_parse_imei(struct cJSON *at_resp, struct cJSON **resp)
         struct cJSON *at_command = cJSON_GetObjectItemCaseSensitive(at_data, "command");
         char *cmd = cJSON_GetStringValue(at_command);
         size_t cmd_len = strlen(cmd);
-        struct cJSON *data = cJSON_CreateObject();
+
+        struct cJSON *resp_data = cJSON_CreateObject();
         struct cJSON *item = NULL;
         bool success = true;
         char *imei = NULL;
         size_t imei_len = 0;
+
         cJSON_ArrayForEach(item, at_result)
         {
                 if (!cJSON_IsString(item)) {
@@ -48,24 +50,30 @@ static int quectel_eg06_parse_imei(struct cJSON *at_resp, struct cJSON **resp)
         if (imei == NULL || imei_len == 0) {
                 success = false;
         }
-        char msg_buf[RESPONSE_BUFFER_SIZE] = { 0 };
-        int msg_len = 0;
-        const char *type = NULL;
+
+        char type[] = "imei";
 
         if (success) {
-                type = "imei";
-                msg_len = snprintf(msg_buf, sizeof(msg_buf), "IMEI: %.*s", imei_len, imei);
-                cJSON_AddStringToObject(data, "imei", imei);
+                char msg[] = "Successfully got IMEI";
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, resp_data);
+                cJSON_AddStringToObject(resp_data, "imei", imei);
         } else {
-                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Failed to read IMEI");
-                type = "error";
-                cJSON_Delete(data);
-                data = NULL;
+                char msg[] = "Failed to get IMEI";
+                cJSON_Delete(resp_data);
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, resp_data);
         }
-        if (msg_len > (typeof(msg_len))sizeof(msg_buf) - 1) {
-                msg_len = (typeof(msg_len))sizeof(msg_buf) - 1;
+
+        return EXIT_SUCCESS;
+}
+
+static int quectel_eg06_print_imei(struct cJSON *parser_output)
+{
+        if (!is_valid_response(parser_output)) {
+                return EXIT_FAILURE;
         }
-        *resp = create_response(success, type, strlen(type), msg_buf, msg_len, data);
+        struct cJSON *data = get_response_data(parser_output);
+        struct cJSON *imei = cJSON_GetObjectItemCaseSensitive(data, "imei");
+        printf("IMEI: %s\n", cJSON_GetStringValue(imei));
         return EXIT_SUCCESS;
 }
 
@@ -82,12 +90,11 @@ static int quectel_eg06_parse_model(struct cJSON *at_resp, struct cJSON **resp)
         struct cJSON *data = cJSON_CreateObject();
         struct cJSON *item = NULL;
         bool success = true;
-        char *vendor = NULL;
-        size_t vendor_len = 0;
-        char *model = NULL;
-        size_t model_len = 0;
-        char *revision = NULL;
-        size_t revision_len = 0;
+
+        struct cJSON *vendor = NULL;
+        struct cJSON *model = NULL;
+        struct cJSON *revision = NULL;
+
         cJSON_ArrayForEach(item, at_result)
         {
                 if (!cJSON_IsString(item)) {
@@ -108,41 +115,49 @@ static int quectel_eg06_parse_model(struct cJSON *at_resp, struct cJSON **resp)
                         continue;
                 }
                 if (vendor == NULL) {
-                        vendor = line;
-                        vendor_len = len;
+                        vendor = cJSON_AddStringToObject(data, "vendor", line);
                 } else if (model == NULL) {
-                        model = line;
-                        model_len = len;
+                        model = cJSON_AddStringToObject(data, "model", line);
                 } else if (revision == NULL) {
-                        revision = line;
-                        revision_len = len;
+                        revision = cJSON_AddStringToObject(data, "revision", line);
                 }
         }
         if (vendor == NULL || model == NULL || revision == NULL) {
                 success = false;
         }
-        char msg_buf[RESPONSE_BUFFER_SIZE] = { 0 };
-        int msg_len = 0;
-        const char *type = NULL;
+        char type[] = "model";
 
         if (success) {
-                type = "model";
-                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Model: %.*s %.*s %.*s", vendor_len, vendor, model_len, model, revision_len, revision);
-                cJSON_AddStringToObject(data, "vendor", vendor);
-                cJSON_AddStringToObject(data, "model", model);
-                cJSON_AddStringToObject(data, "revision", revision);
+                char msg[] = "Successfully got model";
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
         } else {
-                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Failed to read model");
-                type = "error";
+                char msg[] = "Failed to get model";
                 cJSON_Delete(data);
                 data = NULL;
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, NULL);
         }
-        if (msg_len > (typeof(msg_len))sizeof(msg_buf) - 1) {
-                msg_len = (typeof(msg_len))sizeof(msg_buf) - 1;
-        }
-        *resp = create_response(success, type, strlen(type), msg_buf, msg_len, data);
+
         return EXIT_SUCCESS;
 }
+
+
+static int quectel_eg06_print_model(struct cJSON *parser_output)
+{
+        if (!is_valid_response(parser_output)) {
+                return EXIT_FAILURE;
+        }
+        struct cJSON *data = get_response_data(parser_output);
+        struct cJSON *vendor = cJSON_GetObjectItemCaseSensitive(data, "vendor");
+        struct cJSON *model = cJSON_GetObjectItemCaseSensitive(data, "model");
+        struct cJSON *revision = cJSON_GetObjectItemCaseSensitive(data, "revision");
+        if (!cJSON_IsString(vendor) || !cJSON_IsString(model) || !cJSON_IsString(revision)) {
+                return EXIT_FAILURE;
+        }
+        printf("Model: %s %s %s\n", cJSON_GetStringValue(vendor), cJSON_GetStringValue(model), cJSON_GetStringValue(revision));
+        return EXIT_SUCCESS;
+}
+
+
 
 static int quectel_eg06_parse_operator(struct cJSON *at_resp, struct cJSON **resp)
 {
@@ -152,13 +167,11 @@ static int quectel_eg06_parse_operator(struct cJSON *at_resp, struct cJSON **res
         struct cJSON *at_data = get_response_data(at_resp);
         struct cJSON *at_result = cJSON_GetObjectItemCaseSensitive(at_data, "result");
         struct cJSON *at_command = cJSON_GetObjectItemCaseSensitive(at_data, "command");
-        char *cmd = cJSON_GetStringValue(at_command);
-        size_t cmd_len = strlen(cmd);
         struct cJSON *data = cJSON_CreateObject();
         struct cJSON *item = NULL;
-        bool success = true;
+        bool success = false;
         char operator_id[17] = { 0 }; // TODO: constant
-        size_t operator_id_len = 0;
+
         cJSON_ArrayForEach(item, at_result)
         {
                 if (!cJSON_IsString(item)) {
@@ -173,39 +186,48 @@ static int quectel_eg06_parse_operator(struct cJSON *at_resp, struct cJSON **res
                         success = false;
                         break;
                 }
-                if (operator_id_len == 0) {
-                        sscanf(line, "+COPS: %*d,%*d,\"%16[^\"]\"", operator_id); // TODO: constant
-                        operator_id_len = strlen(operator_id);
-                }
-                if (is_empty(line, strlen(line))
-                        || strncmp(line, cmd, cmd_len) == 0
-                        || is_unsolicited_event(line, len)) {
-                        continue;
+                if (sscanf(line, "+COPS: %*d,%*d,\"%16[^\"]\"", operator_id) == 1) {
+                        cJSON_AddStringToObject(data, "operator", operator_id);
+                        success = true;
                 }
         }
-        if (operator_id_len == 0) {
-                success = false;
-        }
-        char msg_buf[RESPONSE_BUFFER_SIZE] = { 0 };
-        int msg_len = 0;
-        const char *type = NULL;
 
+        char type[] = "operator";
         if (success) {
-                type = "model";
-                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Operator: %.*s", operator_id_len, operator_id);
-                cJSON_AddStringToObject(data, "operator", operator_id);
-        } else { // TODO: +CME ERROR here
-                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Failed to get current operator");
-                type = "error";
+                char msg[] = "Successfully got operator";
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
+        } else {
+                char msg[] = "Failed to get operator";
                 cJSON_Delete(data);
                 data = NULL;
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, NULL);
         }
-        if (msg_len > (typeof(msg_len))sizeof(msg_buf) - 1) {
-                msg_len = (typeof(msg_len))sizeof(msg_buf) - 1;
-        }
-        *resp = create_response(success, type, strlen(type), msg_buf, msg_len, data);
         return EXIT_SUCCESS;
 }
+
+
+static int quectel_eg06_print_operator(struct cJSON *parser_output)
+{
+        if (!is_valid_response(parser_output)) {
+                return EXIT_FAILURE;
+        }
+        struct cJSON *data = get_response_data(parser_output);
+        struct cJSON *operator = cJSON_GetObjectItemCaseSensitive(data, "operator");
+        if (!cJSON_IsString(operator)) {
+                return EXIT_FAILURE;
+        }
+        printf("Operator: %s\n", cJSON_GetStringValue(operator));
+        return EXIT_SUCCESS;
+}
+
+char *connection_status_txt[] = {
+        "Disconnected",
+        "Connected",
+        "Connecting",
+        "Unknown",
+        "Registration denied",
+        "Connected (roaming)",
+};
 
 static int quectel_eg06_parse_connection_status(struct cJSON *at_resp, struct cJSON **resp)
 {
@@ -215,8 +237,6 @@ static int quectel_eg06_parse_connection_status(struct cJSON *at_resp, struct cJ
         struct cJSON *at_data = get_response_data(at_resp);
         struct cJSON *at_result = cJSON_GetObjectItemCaseSensitive(at_data, "result");
         struct cJSON *at_command = cJSON_GetObjectItemCaseSensitive(at_data, "command");
-        char *cmd = cJSON_GetStringValue(at_command);
-        size_t cmd_len = strlen(cmd);
         struct cJSON *data = cJSON_CreateObject();
         struct cJSON *item = NULL;
         bool success = true;
@@ -238,55 +258,40 @@ static int quectel_eg06_parse_connection_status(struct cJSON *at_resp, struct cJ
                 if (sscanf(line, "+CREG: %*d,%d", &connection_status) == 1) {
                         continue;
                 }
-                if (is_empty(line, strlen(line))
-                        || strncmp(line, cmd, cmd_len) == 0
-                        || is_unsolicited_event(line, len)) {
-                        continue;
-                }
         }
-        char connection_status_buf[20];
-        switch (connection_status) {
-        case 0:
-                snprintf(connection_status_buf, sizeof(connection_status_buf), "%s", "Disconnected");
-                break;
-        case 1:
-                snprintf(connection_status_buf, sizeof(connection_status_buf), "%s", "Connected");
-                break;
-        case 2:
-                snprintf(connection_status_buf, sizeof(connection_status_buf), "%s", "Connecting");
-                break;
-        case 3:
-                snprintf(connection_status_buf, sizeof(connection_status_buf), "%s", "Registration denied");
-                break;
-        case 5:
-                snprintf(connection_status_buf, sizeof(connection_status_buf), "%s", "Connected (roaming)");
-                break;
-        default:
-                snprintf(connection_status_buf, sizeof(connection_status_buf), "%s", "Unknown");
-                break;
+        char type[] = "connection_status";
+        if (connection_status < 0 || connection_status > sizeof(connection_status)) {
+                success = false;
         }
-        char msg_buf[RESPONSE_BUFFER_SIZE] = { 0 };
-        int msg_len = 0;
-        const char *type = NULL;
 
         if (success) {
-                type = "model";
-                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Connection: %s", connection_status_buf);
-                cJSON_AddStringToObject(data, "connection_text", connection_status_buf);
+                char msg[] = "Successfully got connection status";
+                cJSON_AddStringToObject(data, "connection_text", connection_status_txt[connection_status]);
                 cJSON_AddNumberToObject(data, "connection_code", (double)connection_status);
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
         } else { // TODO: +CME ERROR here
-                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Failed to get connection status");
-                type = "error";
+                char msg[] = "Failed to get connection status";
                 cJSON_Delete(data);
                 data = NULL;
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
         }
-        if (msg_len > (typeof(msg_len))sizeof(msg_buf) - 1) {
-                msg_len = (typeof(msg_len))sizeof(msg_buf) - 1;
-        }
-        *resp = create_response(success, type, strlen(type), msg_buf, msg_len, data);
+
         return EXIT_SUCCESS;
 }
 
+static int quectel_eg06_print_connection_status(struct cJSON *parser_output)
+{
+        if (!is_valid_response(parser_output)) {
+                return EXIT_FAILURE;
+        }
+        struct cJSON *data = get_response_data(parser_output);
+        struct cJSON *connection_status = cJSON_GetObjectItemCaseSensitive(data, "connection_text");
+        if (!cJSON_IsString(connection_status)) {
+                return EXIT_FAILURE;
+        }
+        printf("Connection: %s\n", cJSON_GetStringValue(connection_status));
+        return EXIT_SUCCESS;
+}
 
 struct band {
         uint64_t mask;
@@ -366,8 +371,6 @@ static int quectel_eg06_parse_band(struct cJSON *at_resp, struct cJSON **resp)
         struct cJSON *at_data = get_response_data(at_resp);
         struct cJSON *at_result = cJSON_GetObjectItemCaseSensitive(at_data, "result");
         struct cJSON *at_command = cJSON_GetObjectItemCaseSensitive(at_data, "command");
-        char *cmd = cJSON_GetStringValue(at_command);
-        size_t cmd_len = strlen(cmd);
         struct cJSON *data = cJSON_CreateObject();
         struct cJSON *item = NULL;
         bool success = true;
@@ -390,37 +393,17 @@ static int quectel_eg06_parse_band(struct cJSON *at_resp, struct cJSON **resp)
                 if (sscanf(line, "+QCFG: \"band\",0x%" SCNx32 ",0x%" SCNx64, &bandval, &ltebandval) == 1) {
                         continue;
                 }
-                if (is_empty(line, strlen(line))
-                        || strncmp(line, cmd, cmd_len) == 0
-                        || is_unsolicited_event(line, len)) {
-                        continue;
-                }
         }
 
         struct cJSON *bands_json = cJSON_CreateArray();
         cJSON_AddItemToObject(data, "bands", bands_json);
 
-        char msg_buf[RESPONSE_BUFFER_SIZE] = { 0 };
-        char msg_begining[] = "Bands: ";
-        char msg_len = sizeof(msg_begining) - 1;
-        strncat(msg_buf, msg_begining, sizeof(msg_buf));
-        char sep[] = ", ";
-        bool first = true;
 
         for (int i = 0;i < wcdma_bands_len; i++) {
                 struct band *b = &wcdma_bands[i];
                 if (!(b->mask & bandval)) {
                         continue;
                 }
-
-                if (!first) {
-                        strncat(msg_buf + msg_len, sep, sizeof(msg_buf) - msg_len);
-                        msg_len += sizeof(sep) - 1;
-                }
-                first = false;
-                size_t name_len = strlen(b->name);
-                strncat(msg_buf + msg_len, b->name, sizeof(msg_buf) - msg_len);
-                msg_len += name_len;
                 cJSON_AddItemToArray(bands_json, cJSON_CreateString(b->name));
         }
 
@@ -429,30 +412,56 @@ static int quectel_eg06_parse_band(struct cJSON *at_resp, struct cJSON **resp)
                 if (!(b->mask & ltebandval)) {
                         continue;
                 }
-
-                if (!first) {
-                        strncat(msg_buf + msg_len, sep, sizeof(msg_buf) - msg_len);
-                        msg_len += sizeof(sep) - 1;
-                }
-                first = false;
-                size_t name_len = strlen(b->name);
-                strncat(msg_buf + msg_len, b->name, sizeof(msg_buf) - msg_len);
-                msg_len += name_len;
                 cJSON_AddItemToArray(bands_json, cJSON_CreateString(b->name));
         }
-        const char *type = NULL;
+        char type[] = "band";
 
         if (success) {
-                type = "model";
+                char msg[] = "Successfully got bands";
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
         } else { // TODO: +CME ERROR here
-                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Failed to get band");
-                type = "error";
+                char msg[] = "Failed to get connection status";
                 cJSON_Delete(data);
                 data = NULL;
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, NULL);
         }
-        *resp = create_response(success, type, strlen(type), msg_buf, msg_len, data);
         return EXIT_SUCCESS;
 }
+
+static int quectel_eg06_print_band(struct cJSON *parser_output)
+{
+
+        if (!is_valid_response(parser_output)) {
+                return EXIT_FAILURE;
+        }
+        struct cJSON *data = get_response_data(parser_output);
+        struct cJSON *bands = cJSON_GetObjectItemCaseSensitive(data, "bands");
+        if (!cJSON_IsArray(bands)) {
+                return EXIT_FAILURE;
+        }
+        struct cJSON *item = NULL;
+        printf("Bands: ");
+        bool first = true;
+        cJSON_ArrayForEach(item, bands)
+        {
+                if (!cJSON_IsString(item)) {
+                        continue;
+                }
+                if (!first) {
+                        printf(", ");
+                }
+                first = false;
+                printf("%s", cJSON_GetStringValue(item));
+        }
+        printf("\n");
+        return EXIT_SUCCESS;
+}
+
+char *sim_state_txt[] = {
+        "removed",
+        "inserted",
+        "unkown",
+};
 
 static int quectel_eg06_parse_sim_status(struct cJSON *at_resp, struct cJSON **resp)
 {
@@ -462,8 +471,6 @@ static int quectel_eg06_parse_sim_status(struct cJSON *at_resp, struct cJSON **r
         struct cJSON *at_data = get_response_data(at_resp);
         struct cJSON *at_result = cJSON_GetObjectItemCaseSensitive(at_data, "result");
         struct cJSON *at_command = cJSON_GetObjectItemCaseSensitive(at_data, "command");
-        char *cmd = cJSON_GetStringValue(at_command);
-        size_t cmd_len = strlen(cmd);
         struct cJSON *data = cJSON_CreateObject();
         struct cJSON *item = NULL;
         bool success = true;
@@ -482,46 +489,38 @@ static int quectel_eg06_parse_sim_status(struct cJSON *at_resp, struct cJSON **r
                         success = false;
                         break;
                 }
-                sscanf(line, "+QSIMSTAT: %*d,%d", &sim_state); // TODO: constant
+                sscanf(line, "+QSIMSTAT: %*d,%d", &sim_state);
 
-                if (is_empty(line, strlen(line))
-                        || strncmp(line, cmd, cmd_len) == 0
-                        || is_unsolicited_event(line, len)) {
-                        continue;
-                }
-        }
-        char state_str[10];
-        switch (sim_state) {
-        case 0:
-                strncpy(state_str, "removed", sizeof(state_str) - 1);
-                break;
-        case 1:
-                strncpy(state_str, "inserted", sizeof(state_str) - 1);
-                break;
-        default:
-                strncpy(state_str, "unknown", sizeof(state_str) - 1);
-                break;
         }
 
-        char msg_buf[RESPONSE_BUFFER_SIZE] = { 0 };
-
-        int msg_len = 0;
-        const char *type = NULL;
+        if (sim_state < 0 || sim_state >= sizeof(sim_state_txt)) {
+                success = false;
+        }
+        char type[] = "sim_state";
 
         if (success) {
-                type = "model";
-                msg_len = snprintf(msg_buf, sizeof(msg_buf), "SIM state: %.*s", sizeof(state_str), state_str);
-                cJSON_AddStringToObject(data, "state", state_str);
-        } else {
-                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Failed to get current operator");
-                type = "error";
+                char msg[] = "Successfully got bands";
+                cJSON_AddStringToObject(data, "state", sim_state_txt[sim_state]);
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
+        } else { // TODO: +CME ERROR here
+                char msg[] = "Failed to get connection status";
                 cJSON_Delete(data);
                 data = NULL;
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, NULL);
         }
-        if (msg_len > (typeof(msg_len))sizeof(msg_buf) - 1) {
-                msg_len = (typeof(msg_len))sizeof(msg_buf) - 1;
+}
+
+static int quectel_eg06_print_sim_status(struct cJSON *parser_output)
+{
+        if (!is_valid_response(parser_output)) {
+                return EXIT_FAILURE;
         }
-        *resp = create_response(success, type, strlen(type), msg_buf, msg_len, data);
+        struct cJSON *data = get_response_data(parser_output);
+        struct cJSON *state = cJSON_GetObjectItemCaseSensitive(data, "state");
+        if (!cJSON_IsString(state)) {
+                return EXIT_FAILURE;
+        }
+        printf("SIM: %s\n", cJSON_GetStringValue(state));
         return EXIT_SUCCESS;
 }
 
@@ -533,8 +532,6 @@ static int quectel_eg06_parse_signal(struct cJSON *at_resp, struct cJSON **resp)
         struct cJSON *at_data = get_response_data(at_resp);
         struct cJSON *at_result = cJSON_GetObjectItemCaseSensitive(at_data, "result");
         struct cJSON *at_command = cJSON_GetObjectItemCaseSensitive(at_data, "command");
-        char *cmd = cJSON_GetStringValue(at_command);
-        size_t cmd_len = strlen(cmd);
         struct cJSON *data = cJSON_CreateObject();
         struct cJSON *item = NULL;
         bool success = true;
@@ -554,12 +551,6 @@ static int quectel_eg06_parse_signal(struct cJSON *at_resp, struct cJSON **resp)
                         break;
                 }
                 sscanf(line, "+CSQ: %d,%*d", &signal_strength);
-
-                if (is_empty(line, strlen(line))
-                        || strncmp(line, cmd, cmd_len) == 0
-                        || is_unsolicited_event(line, len)) {
-                        continue;
-                }
         }
         char strength_str[16];
         if (signal_strength == 0) {
@@ -575,25 +566,33 @@ static int quectel_eg06_parse_signal(struct cJSON *at_resp, struct cJSON **resp)
                 strncpy(strength_str, "unknown", sizeof(strength_str) - 1);
         }
 
-        char msg_buf[RESPONSE_BUFFER_SIZE] = { 0 };
-
-        int msg_len = 0;
-        const char *type = NULL;
+        char type[] = "signal";
 
         if (success) {
-                type = "model";
-                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Signal strength: %.*s", sizeof(strength_str), strength_str);
-                cJSON_AddStringToObject(data, "signal_strength", strength_str);
-        } else {
-                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Failed to get signal strength");
-                type = "error";
+                char msg[] = "Successfully got signal strength";
+                cJSON_AddStringToObject(data, "signal", strength_str);
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
+        } else { // TODO: +CME ERROR here
+                char msg[] = "Failed to get signal strength";
                 cJSON_Delete(data);
                 data = NULL;
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, NULL);
         }
-        if (msg_len > (typeof(msg_len))sizeof(msg_buf) - 1) {
-                msg_len = (typeof(msg_len))sizeof(msg_buf) - 1;
+        return EXIT_SUCCESS;
+}
+
+
+static int quectel_eg06_print_signal(struct cJSON *parser_output)
+{
+        if (!is_valid_response(parser_output)) {
+                return EXIT_FAILURE;
         }
-        *resp = create_response(success, type, strlen(type), msg_buf, msg_len, data);
+        struct cJSON *data = get_response_data(parser_output);
+        struct cJSON *signal = cJSON_GetObjectItemCaseSensitive(data, "signal");
+        if (!cJSON_IsString(signal)) {
+                return EXIT_FAILURE;
+        }
+        printf("Signal: %s\n", cJSON_GetStringValue(signal));
         return EXIT_SUCCESS;
 }
 
@@ -605,8 +604,6 @@ static int quectel_eg06_parse_temperature(struct cJSON *at_resp, struct cJSON **
         struct cJSON *at_data = get_response_data(at_resp);
         struct cJSON *at_result = cJSON_GetObjectItemCaseSensitive(at_data, "result");
         struct cJSON *at_command = cJSON_GetObjectItemCaseSensitive(at_data, "command");
-        char *cmd = cJSON_GetStringValue(at_command);
-        size_t cmd_len = strlen(cmd);
         struct cJSON *data = cJSON_CreateObject();
         struct cJSON *item = NULL;
         bool success = true;
@@ -628,37 +625,37 @@ static int quectel_eg06_parse_temperature(struct cJSON *at_resp, struct cJSON **
                         break;
                 }
                 sscanf(line, "+QTEMP: %d,%d,%d", &t1, &t2, &t3);
-
-                if (is_empty(line, strlen(line))
-                        || strncmp(line, cmd, cmd_len) == 0
-                        || is_unsolicited_event(line, len)) {
-                        continue;
-                }
         }
         double avg_temp = (t1 + t2 + t3) / 3.0;
 
-        char msg_buf[RESPONSE_BUFFER_SIZE] = { 0 };
-
-        int msg_len = 0;
-        const char *type = NULL;
+        char type[] = "temperature";
 
         if (success) {
-                type = "model";
-                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Temperature: %.1fC", avg_temp);
+                char msg[] = "Successfully got temperature";
                 cJSON_AddNumberToObject(data, "temperature", avg_temp);
-        } else {
-                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Failed to get temperature");
-                type = "error";
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
+        } else { // TODO: +CME ERROR here
+                char msg[] = "Failed to get temperature";
                 cJSON_Delete(data);
                 data = NULL;
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, NULL);
         }
-        if (msg_len > (typeof(msg_len))sizeof(msg_buf) - 1) {
-                msg_len = (typeof(msg_len))sizeof(msg_buf) - 1;
-        }
-        *resp = create_response(success, type, strlen(type), msg_buf, msg_len, data);
         return EXIT_SUCCESS;
 }
 
+static int quectel_eg06_print_temperature(struct cJSON *parser_output)
+{
+        if (!is_valid_response(parser_output)) {
+                return EXIT_FAILURE;
+        }
+        struct cJSON *data = get_response_data(parser_output);
+        struct cJSON *temperature = cJSON_GetObjectItemCaseSensitive(data, "temperature");
+        if (!cJSON_IsNumber(temperature)) {
+                return EXIT_FAILURE;
+        }
+        printf("Temperature: %.01f\n", cJSON_GetNumberValue(temperature));
+        return EXIT_SUCCESS;
+}
 
 static int quectel_eg06_parse_apn(struct cJSON *at_resp, struct cJSON **resp)
 {
@@ -674,14 +671,6 @@ static int quectel_eg06_parse_apn(struct cJSON *at_resp, struct cJSON **resp)
         struct cJSON *apns = cJSON_CreateArray();
         cJSON_AddItemToObject(data, "apns", apns);
 
-        char msg_buf[RESPONSE_BUFFER_SIZE] = { 0 };
-        char msg_len = 0;
-        bool first = true;
-        char beginning[] = "APNs: ";
-        char sep[] = ", ";
-        strncat(msg_buf, beginning, sizeof(msg_buf));
-        msg_len += sizeof(beginning) - 1;
-
         cJSON_ArrayForEach(item, at_result)
         {
                 if (!cJSON_IsString(item)) {
@@ -696,29 +685,50 @@ static int quectel_eg06_parse_apn(struct cJSON *at_resp, struct cJSON **resp)
                         success = false;
                         break;
                 }
-                if (sscanf(line, "+CGDCONT: %*d,\"%*[^\"]\",\"%64[^\"]\"", apn) == 1) {
+                if (sscanf(line, "+CGDCONT: %*d,\"%*[^\"]\",\"%63[^\"]\"", apn) == 1) {
                         cJSON_AddItemToArray(apns, cJSON_CreateString(apn));
-                        if (!first) {
-                                strncat(msg_buf + msg_len, sep, sizeof(msg_buf) - msg_len);
-                                msg_len += sizeof(sep) - 1;
-                        }
-                        first = false;
-                        strncat(msg_buf + msg_len, apn, sizeof(msg_buf) - msg_len);
-                        msg_len += strlen(apn);
                 }
         }
 
-        const char *type = NULL;
+        char type[] = "apn";
 
         if (success) {
-                type = "model";
+                char msg[] = "Successfully got APN";
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
         } else { // TODO: +CME ERROR here
-                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Failed to get APN");
-                type = "error";
+                char msg[] = "Failed to get apns";
                 cJSON_Delete(data);
                 data = NULL;
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, NULL);
         }
-        *resp = create_response(success, type, strlen(type), msg_buf, msg_len, data);
+        return EXIT_SUCCESS;
+}
+
+static int quectel_eg06_print_apn(struct cJSON *parser_output)
+{
+        if (!is_valid_response(parser_output)) {
+                return EXIT_FAILURE;
+        }
+        struct cJSON *data = get_response_data(parser_output);
+        struct cJSON *apns = cJSON_GetObjectItemCaseSensitive(data, "apns");
+        if (!cJSON_IsArray(apns)) {
+                return EXIT_FAILURE;
+        }
+        printf("APNS: ");
+        bool first = true;
+        struct cJSON *item = NULL;
+        cJSON_ArrayForEach(item, apns)
+        {
+                if (!cJSON_IsString(item)) {
+                        continue;
+                }
+                if (!first) {
+                        printf(", ");
+                }
+                first = false;
+                printf("%s", cJSON_GetStringValue(item));
+        }
+        printf("\n");
         return EXIT_SUCCESS;
 }
 
@@ -731,11 +741,11 @@ static int quectel_eg06_parse_serving_cell(struct cJSON *at_resp, struct cJSON *
         struct cJSON *at_result = cJSON_GetObjectItemCaseSensitive(at_data, "result");
         struct cJSON *data = cJSON_CreateObject();
         struct cJSON *item = NULL;
-        bool success = true;
+        bool success = false;
 
         char state[16] = { 0 };
         char generation[16] = { 0 };
-        uint64_t cell_id = 0;
+        uint64_t id = 0;
 
         cJSON_ArrayForEach(item, at_result)
         {
@@ -751,26 +761,41 @@ static int quectel_eg06_parse_serving_cell(struct cJSON *at_resp, struct cJSON *
                         success = false;
                         break;
                 }
-                sscanf(line, "+QENG: \"servingcell\",\"%12[^\"]\",\"%12[^\"]\",%*[^,],%*[^,],%*[^,],%llx", state, generation, &cell_id);
+                if (sscanf(line, "+QENG: \"servingcell\",\"%15[^\"]\",\"%15[^\"]\",%*[^,],%*[^,],%*[^,],%llx", state, generation, &id) == 3) {
+                        cJSON_AddStringToObject(data, "generation", generation);
+                        cJSON_AddStringToObject(data, "state", state);
+                        cJSON_AddNumberToObject(data, "id", id);
+                        success = true;
+                }
         }
 
-        char msg_buf[RESPONSE_BUFFER_SIZE] = { 0 };
-        char msg_len = 0;
-        msg_len = snprintf(msg_buf, sizeof(msg_buf), "Serving Cell: %s %s (cell_id:%llx)", generation, state, cell_id);
-        const char *type = NULL;
+        char type[] = "serving_cell";
 
         if (success) {
-                type = "model";
-                cJSON_AddStringToObject(data, "generation", generation);
-                cJSON_AddStringToObject(data, "state", state);
-                cJSON_AddNumberToObject(data, "cell_id", cell_id);
-        } else {
-                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Failed to get band");
-                type = "error";
+                char msg[] = "Successfully got serving cell";
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
+        } else { // TODO: +CME ERROR here
+                char msg[] = "Failed to get serving cell";
                 cJSON_Delete(data);
                 data = NULL;
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, NULL);
         }
-        *resp = create_response(success, type, strlen(type), msg_buf, msg_len, data);
+        return EXIT_SUCCESS;
+}
+
+static int quectel_eg06_print_serving_cell(struct cJSON *parser_output)
+{
+        if (!is_valid_response(parser_output)) {
+                return EXIT_FAILURE;
+        }
+        struct cJSON *data = get_response_data(parser_output);
+        struct cJSON *generation = cJSON_GetObjectItemCaseSensitive(data, "generation");
+        struct cJSON *state = cJSON_GetObjectItemCaseSensitive(data, "state");
+        struct cJSON *id = cJSON_GetObjectItemCaseSensitive(data, "id");
+        if (!cJSON_IsString(generation) || !cJSON_IsString(state) || !cJSON_IsNumber(id)) {
+                return EXIT_FAILURE;
+        }
+        printf("Serving cell: %s %s %.00f\n", cJSON_GetStringValue(generation), cJSON_GetStringValue(state), cJSON_GetNumberValue(id));
         return EXIT_SUCCESS;
 }
 
@@ -791,19 +816,12 @@ static int quectel_eg06_parse_neighbour_cells(struct cJSON *at_resp, struct cJSO
         struct cJSON *item = NULL;
         bool success = true;
 
-        char msg_buf[RESPONSE_BUFFER_SIZE] = { 0 };
-        size_t msg_len = 0;
-
-        char beginning[] = "Neighbour cells:\n";
-        strncpy(msg_buf, beginning, sizeof(msg_buf));
-        msg_len += sizeof(beginning) - 1;
-
         enum qeng_mode mode = QENG_UNKNOWN;
         char mode_buf[8] = { 0 };
         const char lte[] = "LTE";
         const char wcdma[] = "WCDMA";
 
-        char cell_type[8];
+        char technology[8];
         char id[16];
 
         struct cJSON *cells = cJSON_CreateArray();
@@ -828,43 +846,80 @@ static int quectel_eg06_parse_neighbour_cells(struct cJSON *at_resp, struct cJSO
                         break;
                 }
                 if (mode == QENG_UNKNOWN && sscanf(line, "+QENG: \"servingcell\",%*[^,],\"%7[^\"]", mode_buf) == 1) {
-                        if (strncmp(mode_buf, lte, sizeof(lte) - 1) == 0) {
+                        if (strcmp(mode_buf, lte) == 0) {
                                 mode = QENG_LTE;
-                        } else if (strncmp(mode_buf, wcdma, sizeof(wcdma) - 1) == 0) {
+                        } else if (strcmp(mode_buf, wcdma) == 0) {
                                 mode = QENG_WCDMA;
                         }
-                } else if (sscanf(line, "+QENG: \"neighbourcell%*[^\"]\",\"%7[^\"]\",%*[^,],%15[^,],", cell_type, id) == 2) {
+                } else if (sscanf(line, "+QENG: \"neighbour%*[^\"]\",\"%7[^\"]\",%*[^,],%15[^,],", technology, id) == 2) {
                         cell = cJSON_CreateObject();
                         cJSON_AddItemToArray(cells, cell);
-                        cJSON_AddStringToObject(cell, "cell_type", cell_type);
-                        cJSON_AddStringToObject(cell, "id", id);
-                        buf_len = snprintf(buf, sizeof(buf), "  - type: %s, id: %s\n", cell_type, id);
-                        strncat(msg_buf + msg_len, buf, sizeof(msg_buf) - msg_len);
-                        msg_len += buf_len;
-
+                        cJSON_AddStringToObject(cell, "technology", technology);
+                        if (mode == QENG_LTE) {
+                                cJSON_AddStringToObject(cell, "physical_cell_id", id);
+                        } else if (mode == QENG_WCDMA && strcmp(technology, "LTE") == 0) {
+                                cJSON_AddStringToObject(cell, "cell_id", id);
+                        }
                 }
         }
-        msg_buf[msg_len - 1] = '\0';
-        const char *type = NULL;
+
+        char type[] = "neighbour_cells";
 
         if (success) {
-                type = "neighbourcell";
-        } else {
-                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Failed to get serving cell");
-                type = "error";
+                char msg[] = "Successfully got neighbour cells";
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
+        } else { // TODO: +CME ERROR here
+                char msg[] = "Failed to get neighbour cells";
                 cJSON_Delete(data);
                 data = NULL;
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, NULL);
         }
-        *resp = create_response(success, type, strlen(type), msg_buf, msg_len, data);
         return EXIT_SUCCESS;
 }
 
-char *pdu_stat[] = {
-        "Received unread messages",
-        "Received read messages",
-        "Stored unsent messages",
-        "Stored sent messages",
-        "All messages",
+
+static int quectel_eg06_print_neighbour_cells(struct cJSON *parser_output)
+{
+        if (!is_valid_response(parser_output)) {
+                return EXIT_FAILURE;
+        }
+        struct cJSON *data = get_response_data(parser_output);
+        struct cJSON *cells = cJSON_GetObjectItemCaseSensitive(data, "cells");
+        if (!cJSON_IsArray(cells)) {
+                return EXIT_FAILURE;
+        }
+        struct cJSON *item = NULL;
+        printf("Neighbour cells:\n");
+        cJSON_ArrayForEach(item, cells)
+        {
+                if (!cJSON_IsObject(item)) {
+                        continue;
+                }
+                struct cJSON *technology = cJSON_GetObjectItemCaseSensitive(item, "technology");
+                struct cJSON *phys_id = cJSON_GetObjectItemCaseSensitive(item, "physical_cell_id");
+                struct cJSON *cell_id = cJSON_GetObjectItemCaseSensitive(item, "cell_id");
+                if (!cJSON_IsString(technology)) {
+                        continue;
+                }
+                printf("  - RAT = %s", cJSON_GetStringValue(technology));
+                if (cJSON_IsString(phys_id)) {
+                        printf(" physical_cell_id = %s", cJSON_GetStringValue(phys_id));
+                }
+                if (cJSON_IsString(cell_id)) {
+                        printf(" cell_id = %s", cJSON_GetStringValue(cell_id));
+                }
+                printf("\n");
+        }
+        return EXIT_SUCCESS;
+}
+
+
+char *message_type[] = {
+        "unread",
+        "read",
+        "unsent",
+        "sent",
+        "all",
 };
 
 static int quectel_eg06_parse_sms(struct cJSON *at_resp, struct cJSON **resp)
@@ -886,11 +941,7 @@ static int quectel_eg06_parse_sms(struct cJSON *at_resp, struct cJSON **resp)
         msg_len += sizeof(beginning) - 1;
 
         struct cJSON *msgs = cJSON_CreateArray();
-        cJSON_AddItemToObject(data, "msgs", msgs);
-        struct cJSON *sms = NULL;
-
-        char buf[128] = { 0 };
-        size_t buf_len = 0;
+        cJSON_AddItemToObject(data, "messages", msgs);
 
         int index = 0;
         int stat = 0;
@@ -911,28 +962,53 @@ static int quectel_eg06_parse_sms(struct cJSON *at_resp, struct cJSON **resp)
                         break;
                 }
                 if (sscanf(line, "+CMGL: %d,%d,,%d", &index, &stat, &length) == 3) { // <alpha> may occur
-                        sms = cJSON_CreateObject();
+                        struct cJSON *sms = cJSON_CreateObject();
                         cJSON_AddItemToArray(msgs, sms);
                         cJSON_AddNumberToObject(sms, "index", index);
-                        cJSON_AddStringToObject(sms, "stat", pdu_stat[stat]);
+                        cJSON_AddStringToObject(sms, "stat", message_type[stat]);
                         cJSON_AddNumberToObject(sms, "length", length);
-                        buf_len = snprintf(msg_buf + msg_len, sizeof(msg_buf) - msg_len, "  -index: %d, stat: %s, length: %d\n", index, pdu_stat[stat], length);
-                        msg_len += buf_len;
                 }  // TODO: message parsing
         }
 
-        msg_buf[msg_len - 1] = '\0';
-        const char *type = NULL;
+        char type[] = "sms";
 
         if (success) {
-                type = "sms";
-        } else {
-                msg_len = snprintf(msg_buf, sizeof(msg_buf), "Failed to get serving cell");
-                type = "error";
+                char msg[] = "Successfully got SMS";
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
+        } else { // TODO: +CME ERROR here
+                char msg[] = "Failed to get SMS";
                 cJSON_Delete(data);
                 data = NULL;
+                *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, NULL);
         }
-        *resp = create_response(success, type, strlen(type), msg_buf, msg_len, data);
+        return EXIT_SUCCESS;
+}
+
+static int quectel_eg06_print_sms(struct cJSON *parser_output)
+{
+        if (!is_valid_response(parser_output)) {
+                return EXIT_FAILURE;
+        }
+        struct cJSON *data = get_response_data(parser_output);
+        struct cJSON *messages = cJSON_GetObjectItemCaseSensitive(data, "messages");
+        if (!cJSON_IsArray(messages)) {
+                return EXIT_FAILURE;
+        }
+        struct cJSON *item = NULL;
+        printf("Messages:\n");
+        cJSON_ArrayForEach(item, messages)
+        {
+                if (!cJSON_IsObject(item)) {
+                        continue;
+                }
+                struct cJSON *index = cJSON_GetObjectItemCaseSensitive(item, "index");
+                struct cJSON *stat = cJSON_GetObjectItemCaseSensitive(item, "stat");
+                struct cJSON *length = cJSON_GetObjectItemCaseSensitive(item, "length");
+                if (!cJSON_IsNumber(index) || !cJSON_IsString(stat) || !cJSON_IsNumber(length)) {
+                        continue;
+                }
+                printf("  - index=%.00f state=%s length=%.00f\n", cJSON_GetNumberValue(index), cJSON_GetStringValue(stat), cJSON_GetNumberValue(length));
+        }
         return EXIT_SUCCESS;
 }
 
@@ -943,50 +1019,62 @@ struct modem quectel_eg06 = {
                 [GET_IMEI] = {
                         .parser = quectel_eg06_parse_imei,
                         .at_cmd = "AT+GSN",
+                        .print_parser_resp = quectel_eg06_print_imei,
                 },
                 [GET_MODEL] = {
                         .parser = quectel_eg06_parse_model,
                         .at_cmd = "ATI",
+                        .print_parser_resp = quectel_eg06_print_model,
                 },
                 [GET_OPERATOR] = {
                         .parser = quectel_eg06_parse_operator,
                         .at_cmd = "AT+COPS=3,1;+COPS?",
+                        .print_parser_resp = quectel_eg06_print_operator,
                 },
                 [GET_CONNECTION_STATUS] = {
                         .parser = quectel_eg06_parse_connection_status,
                         .at_cmd = "AT+CREG=1;+CREG?",
+                        .print_parser_resp = quectel_eg06_print_connection_status,
                 },
                 [GET_BAND] = {
                         .parser = quectel_eg06_parse_band,
                         .at_cmd = "AT+QCFG=\"band\"",
+                        .print_parser_resp = quectel_eg06_print_band,
                 },
                 [GET_SIM_STATUS] = {
                         .parser = quectel_eg06_parse_sim_status,
                         .at_cmd = "AT+QSIMSTAT?",
+                        .print_parser_resp = quectel_eg06_print_sim_status,
                 },
                 [GET_SIGNAL] = {
                         .parser = quectel_eg06_parse_signal,
                         .at_cmd = "AT+CSQ",
+                        .print_parser_resp = quectel_eg06_print_signal,
                 },
                 [GET_TEMPERATURE] = {
                         .parser = quectel_eg06_parse_temperature,
                         .at_cmd = "AT+QTEMP",
+                        .print_parser_resp = quectel_eg06_print_temperature,
                 },
                 [GET_CURRENT_APN] = {
                         .parser = quectel_eg06_parse_apn,
-                        .at_cmd = "AT+CGDCONT?"
+                        .at_cmd = "AT+CGDCONT?",
+                        .print_parser_resp = quectel_eg06_print_apn,
                 },
                 [GET_SERVING_CELL] = {
                         .parser = quectel_eg06_parse_serving_cell,
                         .at_cmd = "AT+QENG=\"servingcell\"",
+                        .print_parser_resp = quectel_eg06_print_serving_cell,
                 },
                 [GET_NEIGHBOUR_CELL] = {
                         .parser = quectel_eg06_parse_neighbour_cells,
                         .at_cmd = "AT+QENG=\"servingcell\";+QENG=\"neighbourcell\"",
+                        .print_parser_resp = quectel_eg06_print_neighbour_cells,
                 },
                 [GET_SMS] = {
                         .parser = quectel_eg06_parse_sms,
                         .at_cmd = "AT+CMGF=0;+CMGL=1",
+                        .print_parser_resp = quectel_eg06_print_sms,
                 },
         },
 };

@@ -32,6 +32,7 @@ enum action_code {
 
 struct action {
         int (*parser) (struct cJSON *at_output, struct cJSON **resp);
+        int (*print_parser_resp) (struct cJSON *parser_output);
         const char *at_cmd;
 };
 
@@ -39,6 +40,9 @@ struct modem {
         uint16_t vendor_id;
         uint16_t product_id;
         struct action actions[__ACTIONS_MAX];
+
 };
+
+bool is_action_implemented(struct action *action);
 
 #endif
