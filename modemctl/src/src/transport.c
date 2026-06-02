@@ -16,6 +16,7 @@
 #include <libgen.h>
 #include <modem.h>
 #include <modem_lookup.h>
+#include <context.h>
 
 int get_ttyusb_info(const char *dev_path, size_t dev_path_len, struct usb_info *result)
 {
@@ -140,7 +141,6 @@ int setup_at_port(struct at_port *port)
                 return EXIT_FAILURE;
         }
 
-        port->retry_count = 0;
         port->retry_max = MODEMCTL_DEFAULT_RETRY_MAX;
         port->timeout_seconds = MODEMCTL_DEFAULT_TIMEOUT;
 
@@ -180,24 +180,28 @@ int find_any_at_port(struct at_port *result)
 }
 
 
-struct cJSON *at_execute(struct at_port *port, const char *cmd, size_t cmd_len) // TODO: improve error handling (use goto)
+struct cJSON *at_execute(struct context *ctx, const char *cmd, size_t cmd_len) // TODO: improve error handling (use goto)
 {
-        if (port == NULL || cmd == NULL || cmd_len < 2) {
+        if (ctx->port == NULL || cmd == NULL || cmd_len < 2) {
                 return NULL;
         }
         struct cJSON *result = cJSON_CreateArray();
         if (result == NULL) {
                 return NULL;
         }
-        tcflush(port->fd, TCIFLUSH);
-        write(port->fd, cmd, cmd_len);
+        tcflush(ctx->port->fd, TCIFLUSH);
+        write(ctx->port->fd, cmd, cmd_len);
         const char cmd_end[] = "\r\n";
-        write(port->fd, cmd_end, sizeof(cmd_end) - 1);
+        write(ctx->port->fd, cmd_end, sizeof(cmd_end) - 1);
         char buf[SERIAL_IO_BUF_MAX] = { 0 };
         size_t len = 0;
         ssize_t bytes = 0;
         bool success = false;
-        while (len < sizeof(buf) && (bytes = read(port->fd, &buf[len], 1)) > 0) {
+        while (len < sizeof(buf) && (bytes = read(ctx->port->fd, &buf[len], 1)) > 0) {
+                if (bytes == 0 && ctx->running != NULL && *ctx->running) {
+                        success = false;
+                        break;
+                }
                 len += bytes;
                 if (len >= 2 && buf[len - 2] == '\r' && buf[len - 1] == '\n') {
                         buf[len - 2] = '\0';

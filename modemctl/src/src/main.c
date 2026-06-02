@@ -20,12 +20,12 @@
 #include <modem_lookup.h>
 #include <context.h>
 
-int running = 1;
+bool running = true;
 
 void sig_handler(int sigint)
 {
         (void)sigint;
-        running = 0;
+        running = false;
 }
 
 int execute_cmds(struct context *ctx, struct cJSON *cmds)
@@ -40,9 +40,9 @@ int execute_cmds(struct context *ctx, struct cJSON *cmds)
                         continue;
                 }
                 char *txt = cJSON_GetStringValue(cmd);
-                struct cJSON *resp = at_execute(ctx->port, txt, strlen(txt));
+                struct cJSON *resp = at_execute(ctx, txt, strlen(txt));
                 if (resp == NULL) {
-                        continue; // TODO: reikia generuoti klaida
+                        continue;
                 }
                 if (ctx->json) {
                         char *txt = cJSON_Print(resp);
@@ -67,8 +67,8 @@ int execute_action(struct context *ctx, enum action_code action_code)
                 return EXIT_FAILURE;
         }
 
-        struct cJSON *at_response = at_execute(ctx->port, action->at_cmd, strlen(action->at_cmd));
-        if (at_response == NULL) {
+        struct cJSON *at_response = at_execute(ctx, action->at_cmd, strlen(action->at_cmd));
+        if (at_response == NULL || !get_response_success(at_response)) {
                 return EXIT_FAILURE;
         }
 
@@ -93,13 +93,11 @@ int execute_action(struct context *ctx, enum action_code action_code)
                 printf("Failed to parse\n");
                 ret = EXIT_FAILURE;
         }
-err_out:
         cJSON_Delete(parser_resp);
         cJSON_Delete(at_response);
 
         return ret;
 }
-#define STR(x) #x
 
 int main(int argc, char **argv)
 {
@@ -127,14 +125,14 @@ int main(int argc, char **argv)
         if (device_len > 0) {
                 if (get_at_port(args.device, device_len, &at_port) != EXIT_SUCCESS) {
                         char err[] = "Unsupported device";
-                        printf("%s\n", err); // TODO: json output
+                        printf("%s\n", err);
                         ret = EXIT_FAILURE;
                         goto err_failed_to_open_file;
                 }
         } else {
                 if (find_any_at_port(&at_port) != EXIT_SUCCESS) {
                         char err[] = "Failed to find an AT port";
-                        printf("%s\n", err); // TODO: json output
+                        printf("%s\n", err);
                         ret = EXIT_FAILURE;
                         goto err_failed_to_open_file;
                 }
@@ -142,7 +140,7 @@ int main(int argc, char **argv)
 
         if (setup_at_port(&at_port) != EXIT_SUCCESS) {
                 char err[] = "Failed to setup the AT port";
-                printf("%s\n", err); // TODO: json output
+                printf("%s\n", err);
                 ret = EXIT_FAILURE;
                 goto err_failed_to_open_file;
         }
@@ -150,7 +148,7 @@ int main(int argc, char **argv)
         struct modem modem = { 0 };
         if (get_modem(at_port.usb_info.vendor_id, at_port.usb_info.product_id, &modem) != EXIT_SUCCESS) {
                 char err[] = "Failed to find modem";
-                printf("%s\n", err); // TODO: json output
+                printf("%s\n", err);
                 goto err_failed_to_open_file;
         }
 
@@ -159,6 +157,7 @@ int main(int argc, char **argv)
                 .json = args.json,
                 .modem = &modem,
                 .port = &at_port,
+                .running = &running,
         };
 
         for (int a = 0; a < __ACTIONS_MAX; a++) {
@@ -172,8 +171,14 @@ int main(int argc, char **argv)
                 if (args.all && !is_action_implemented(modem.actions + a)) {
                         continue;
                 }
-                if (execute_action(&ctx, a) != EXIT_SUCCESS) {
-                        printf("Failed to execute action\n");
+                for (int try = 1; try <= at_port.retry_max; try++) {
+                        if (!running) {
+                                break;
+                        }
+                        if (execute_action(&ctx, a) == EXIT_SUCCESS) {
+                                break;
+                        }
+                        printf("Failed to execute action (%d/%d)...\n", try, at_port.retry_max);
                 }
         }
 

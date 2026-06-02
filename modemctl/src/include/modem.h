@@ -4,8 +4,6 @@
 #include <stdbool.h>
 #include <inttypes.h>
 #include <cjson/cJSON.h>
-
-#include <transport.h>
 #include <inttypes.h>
 
 #define LF "\n"
