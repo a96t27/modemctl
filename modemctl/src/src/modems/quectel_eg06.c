@@ -169,7 +169,9 @@ static int quectel_eg06_parse_operator(struct cJSON *at_resp, struct cJSON **res
         struct cJSON *data = cJSON_CreateObject();
         struct cJSON *item = NULL;
         bool success = false;
-        char operator_id[17] = { 0 }; // TODO: constant
+        char scanf_buf[SCANF_BUF_SIZE] = { 0 };
+        char operator_id[OPERATOR_ID_SIZE] = { 0 };
+        snprintf(scanf_buf, sizeof(scanf_buf), "+COPS: %%*d,%%*d,\"%%%d[^\"]\"", sizeof(operator_id) - 1);
 
         cJSON_ArrayForEach(item, at_result)
         {
@@ -185,7 +187,7 @@ static int quectel_eg06_parse_operator(struct cJSON *at_resp, struct cJSON **res
                         success = false;
                         break;
                 }
-                if (sscanf(line, "+COPS: %*d,%*d,\"%16[^\"]\"", operator_id) == 1) {
+                if (sscanf(line, scanf_buf, operator_id) == 1) {
                         cJSON_AddStringToObject(data, "operator", operator_id);
                         success = true;
                 }
@@ -238,7 +240,8 @@ static int quectel_eg06_parse_connection_status(struct cJSON *at_resp, struct cJ
         struct cJSON *data = cJSON_CreateObject();
         struct cJSON *item = NULL;
         bool success = true;
-        int connection_status = 4; // UNKNOWN
+        int connection_status = 4; // UNKNOW
+
         cJSON_ArrayForEach(item, at_result)
         {
                 if (!cJSON_IsString(item)) {
@@ -662,9 +665,13 @@ static int quectel_eg06_parse_apn(struct cJSON *at_resp, struct cJSON **resp)
         struct cJSON *data = cJSON_CreateObject();
         struct cJSON *item = NULL;
         bool success = true;
-        char apn[64] = { 0 };
+
+        char scanf_buf[SCANF_BUF_SIZE] = { 0 };
+        char apn[APN_BUF_SIZE] = { 0 };
+        snprintf(scanf_buf, sizeof(scanf_buf), "+CGDCONT: %%*d,\"%%*[^\"]\",\"%%%d[^\"]\"", sizeof(apn) - 1);
         struct cJSON *apns = cJSON_CreateArray();
         cJSON_AddItemToObject(data, "apns", apns);
+
 
         cJSON_ArrayForEach(item, at_result)
         {
@@ -680,7 +687,7 @@ static int quectel_eg06_parse_apn(struct cJSON *at_resp, struct cJSON **resp)
                         success = false;
                         break;
                 }
-                if (sscanf(line, "+CGDCONT: %*d,\"%*[^\"]\",\"%63[^\"]\"", apn) == 1) {
+                if (sscanf(line, scanf_buf, apn) == 1) {
                         cJSON_AddItemToArray(apns, cJSON_CreateString(apn));
                 }
         }
@@ -738,8 +745,10 @@ static int quectel_eg06_parse_serving_cell(struct cJSON *at_resp, struct cJSON *
         struct cJSON *item = NULL;
         bool success = false;
 
-        char state[16] = { 0 };
-        char generation[16] = { 0 };
+        char state[STATE_BUF_SIZE] = { 0 };
+        char generation[GENERATION_BUF_SIZE] = { 0 };
+        char scanf_buf[SCANF_BUF_SIZE] = { 0 };
+        snprintf(scanf_buf, sizeof(scanf_buf), "+QENG: \"servingcell\",\"%%%d[^\"]\",\"%%%d[^\"]\",%%*[^,],%%*[^,],%%*[^,],%%llx", sizeof(state) - 1, sizeof(generation) - 1);
         uint64_t id = 0;
 
         cJSON_ArrayForEach(item, at_result)
@@ -756,7 +765,7 @@ static int quectel_eg06_parse_serving_cell(struct cJSON *at_resp, struct cJSON *
                         success = false;
                         break;
                 }
-                if (sscanf(line, "+QENG: \"servingcell\",\"%15[^\"]\",\"%15[^\"]\",%*[^,],%*[^,],%*[^,],%llx", state, generation, &id) == 3) {
+                if (sscanf(line, scanf_buf, state, generation, &id) == 3) {
                         cJSON_AddStringToObject(data, "generation", generation);
                         cJSON_AddStringToObject(data, "state", state);
                         cJSON_AddNumberToObject(data, "id", id);
@@ -812,12 +821,19 @@ static int quectel_eg06_parse_neighbour_cells(struct cJSON *at_resp, struct cJSO
         bool success = true;
 
         enum qeng_mode mode = QENG_UNKNOWN;
-        char mode_buf[8] = { 0 };
+        char mode_buf[RAT_BUF_SIZE] = { 0 };
         const char lte[] = "LTE";
         const char wcdma[] = "WCDMA";
 
-        char technology[8];
-        char id[16];
+        char servingcell_scanf_buf[SCANF_BUF_SIZE] = { 0 };
+        snprintf(servingcell_scanf_buf, sizeof(servingcell_scanf_buf), "+QENG: \"servingcell\",%%*[^,],\"%%%d[^\"]", sizeof(mode_buf) - 1);
+
+        char technology[RAT_BUF_SIZE] = { 0 };
+        char id[ID_BUF_SIZE] = { 0 };
+
+
+        char neighbourcell_scanf_buf[SCANF_BUF_SIZE] = { 0 };
+        snprintf(neighbourcell_scanf_buf, sizeof(neighbourcell_scanf_buf), "+QENG: \"neighbour%%*[^\"]\",\"%%%d[^\"]\",%%*[^,],%%%d[^,],", sizeof(technology) - 1, sizeof(id) - 1);
 
         struct cJSON *cells = cJSON_CreateArray();
         cJSON_AddItemToObject(data, "cells", cells);
@@ -837,13 +853,13 @@ static int quectel_eg06_parse_neighbour_cells(struct cJSON *at_resp, struct cJSO
                         success = false;
                         break;
                 }
-                if (mode == QENG_UNKNOWN && sscanf(line, "+QENG: \"servingcell\",%*[^,],\"%7[^\"]", mode_buf) == 1) {
+                if (mode == QENG_UNKNOWN && sscanf(line, servingcell_scanf_buf, mode_buf) == 1) {
                         if (strcmp(mode_buf, lte) == 0) {
                                 mode = QENG_LTE;
                         } else if (strcmp(mode_buf, wcdma) == 0) {
                                 mode = QENG_WCDMA;
                         }
-                } else if (sscanf(line, "+QENG: \"neighbour%*[^\"]\",\"%7[^\"]\",%*[^,],%15[^,],", technology, id) == 2) {
+                } else if (sscanf(line, neighbourcell_scanf_buf, technology, id) == 2) {
                         cell = cJSON_CreateObject();
                         cJSON_AddItemToArray(cells, cell);
                         cJSON_AddStringToObject(cell, "technology", technology);
@@ -893,12 +909,12 @@ static int quectel_eg06_print_neighbour_cells(struct cJSON *parser_output)
                 if (!cJSON_IsString(technology)) {
                         continue;
                 }
-                printf("  - RAT = %s", cJSON_GetStringValue(technology));
+                printf("  - RAT=%s", cJSON_GetStringValue(technology));
                 if (cJSON_IsString(phys_id)) {
-                        printf(" physical_cell_id = %s", cJSON_GetStringValue(phys_id));
+                        printf(" physical_cell_id=%s", cJSON_GetStringValue(phys_id));
                 }
                 if (cJSON_IsString(cell_id)) {
-                        printf(" cell_id = %s", cJSON_GetStringValue(cell_id));
+                        printf(" cell_id=%s", cJSON_GetStringValue(cell_id));
                 }
                 printf("\n");
         }
@@ -953,7 +969,7 @@ static int quectel_eg06_parse_sms(struct cJSON *at_resp, struct cJSON **resp)
                         success = false;
                         break;
                 }
-                if (sscanf(line, "+CMGL: %d,%d,,%d", &index, &stat, &length) == 3) { // <alpha> may occur
+                if (sscanf(line, "+CMGL: %d,%d,,%d", &index, &stat, &length) == 3) {
                         struct cJSON *sms = cJSON_CreateObject();
                         cJSON_AddItemToArray(msgs, sms);
                         cJSON_AddNumberToObject(sms, "index", index);

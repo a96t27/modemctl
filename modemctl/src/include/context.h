@@ -18,6 +18,7 @@ struct at_port {
         float timeout_seconds;
         struct usb_info usb_info;
 };
+
 struct context {
         struct at_port *port;
         struct modem *modem;
@@ -27,5 +28,6 @@ struct context {
 };
 
 bool is_valid_context(struct context *ctx);
+bool is_valid_at_port(struct at_port *port);
 
 #endif
