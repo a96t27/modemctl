@@ -192,6 +192,7 @@ int main(int argc, char **argv)
                                 }
                                 if (!args.json) {
                                         printf("Failed to execute action (%d/%d)...\n", try, at_port.retry_max);
+                                        sleep(at_port.timeout_seconds);
                                 }
                         }
                 }
