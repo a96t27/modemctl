@@ -9,7 +9,7 @@
 struct modem *modems[] = {
         &quectel_eg06,
 };
-size_t modems_count = sizeof(modems) / sizeof(modems[0]);
+int modems_count = sizeof(modems) / sizeof(modems[0]);
 
 int get_modem(uint16_t vendor_id, uint16_t product_id, struct modem *result)
 {

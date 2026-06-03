@@ -157,7 +157,13 @@ int main(int argc, char **argv)
                 .port = &at_port,
                 .running = &running,
         };
-
+        size_t setup_cmd_len = strlen(modem.setup_cmd);
+        if (setup_cmd_len > 0) {
+                struct cJSON *resp = at_execute(&ctx, modem.setup_cmd, setup_cmd_len);
+                if (resp != NULL) {
+                        cJSON_Delete(resp);
+                }
+        }
         bool first = true;
         while ((args.watch || first) && running) {
                 first = false;
@@ -177,7 +183,7 @@ int main(int argc, char **argv)
                         if (args.all && !is_action_implemented(modem.actions + a)) {
                                 continue;
                         }
-                        for (int try = 1; try <= at_port.retry_max; try++) {
+                        for (unsigned int try = 1; try <= at_port.retry_max; try++) {
                                 if (!running) {
                                         break;
                                 }

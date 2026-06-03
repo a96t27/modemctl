@@ -37,6 +37,7 @@ struct action {
 struct modem {
         uint16_t vendor_id;
         uint16_t product_id;
+        const char *setup_cmd;
         struct action actions[__ACTIONS_MAX];
 
 };

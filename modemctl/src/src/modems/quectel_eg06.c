@@ -1023,6 +1023,7 @@ static int quectel_eg06_print_sms(struct cJSON *parser_output)
 struct modem quectel_eg06 = {
         .vendor_id = 0x2C7C,
         .product_id = 0x0306,
+        .setup_cmd = "ATE0;Q0;V1;+CMEE=2",
         .actions = {
                 [GET_IMEI] = {
                         .parser = quectel_eg06_parse_imei,
