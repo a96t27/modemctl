@@ -270,7 +270,7 @@ static int quectel_eg06_parse_connection_status(struct cJSON *at_resp, struct cJ
                 cJSON_AddStringToObject(data, "connection_text", connection_status_txt[connection_status]);
                 cJSON_AddNumberToObject(data, "connection_code", (double)connection_status);
                 *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
-        } else { // TODO: +CME ERROR here
+        } else {
                 char msg[] = "Failed to get connection status";
                 cJSON_Delete(data);
                 data = NULL;
@@ -419,7 +419,7 @@ static int quectel_eg06_parse_band(struct cJSON *at_resp, struct cJSON **resp)
         if (success) {
                 char msg[] = "Successfully got bands";
                 *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
-        } else { // TODO: +CME ERROR here
+        } else {
                 char msg[] = "Failed to get connection status";
                 cJSON_Delete(data);
                 data = NULL;
@@ -501,7 +501,7 @@ static int quectel_eg06_parse_sim_status(struct cJSON *at_resp, struct cJSON **r
                 char msg[] = "Successfully got bands";
                 cJSON_AddStringToObject(data, "state", sim_state_txt[sim_state]);
                 *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
-        } else { // TODO: +CME ERROR here
+        } else {
                 char msg[] = "Failed to get connection status";
                 cJSON_Delete(data);
                 data = NULL;
@@ -571,7 +571,7 @@ static int quectel_eg06_parse_signal(struct cJSON *at_resp, struct cJSON **resp)
                 char msg[] = "Successfully got signal strength";
                 cJSON_AddStringToObject(data, "signal", strength_str);
                 *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
-        } else { // TODO: +CME ERROR here
+        } else {
                 char msg[] = "Failed to get signal strength";
                 cJSON_Delete(data);
                 data = NULL;
@@ -632,7 +632,7 @@ static int quectel_eg06_parse_temperature(struct cJSON *at_resp, struct cJSON **
                 char msg[] = "Successfully got temperature";
                 cJSON_AddNumberToObject(data, "temperature", avg_temp);
                 *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
-        } else { // TODO: +CME ERROR here
+        } else {
                 char msg[] = "Failed to get temperature";
                 cJSON_Delete(data);
                 data = NULL;
@@ -697,7 +697,7 @@ static int quectel_eg06_parse_apn(struct cJSON *at_resp, struct cJSON **resp)
         if (success) {
                 char msg[] = "Successfully got APN";
                 *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
-        } else { // TODO: +CME ERROR here
+        } else {
                 char msg[] = "Failed to get apns";
                 cJSON_Delete(data);
                 data = NULL;
@@ -778,7 +778,7 @@ static int quectel_eg06_parse_serving_cell(struct cJSON *at_resp, struct cJSON *
         if (success) {
                 char msg[] = "Successfully got serving cell";
                 *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
-        } else { // TODO: +CME ERROR here
+        } else {
                 char msg[] = "Failed to get serving cell";
                 cJSON_Delete(data);
                 data = NULL;
@@ -876,7 +876,7 @@ static int quectel_eg06_parse_neighbour_cells(struct cJSON *at_resp, struct cJSO
         if (success) {
                 char msg[] = "Successfully got neighbour cells";
                 *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
-        } else { // TODO: +CME ERROR here
+        } else {
                 char msg[] = "Failed to get neighbour cells";
                 cJSON_Delete(data);
                 data = NULL;
@@ -975,7 +975,7 @@ static int quectel_eg06_parse_sms(struct cJSON *at_resp, struct cJSON **resp)
                         cJSON_AddNumberToObject(sms, "index", index);
                         cJSON_AddStringToObject(sms, "stat", message_type[stat]);
                         cJSON_AddNumberToObject(sms, "length", length);
-                }  // TODO: message parsing
+                }
         }
 
         char type[] = "sms";
@@ -983,7 +983,7 @@ static int quectel_eg06_parse_sms(struct cJSON *at_resp, struct cJSON **resp)
         if (success) {
                 char msg[] = "Successfully got SMS";
                 *resp = create_response(success, type, sizeof(type) - 1, msg, sizeof(msg) - 1, data);
-        } else { // TODO: +CME ERROR here
+        } else {
                 char msg[] = "Failed to get SMS";
                 cJSON_Delete(data);
                 data = NULL;

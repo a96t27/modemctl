@@ -57,7 +57,8 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
                 cJSON_AddItemToArray(arguments->at_cmds, string_json);
                 break;
         case WATCH_KEY:
-                return ARGP_ERR_UNKNOWN; //TODO make --watch option
+                arguments->watch = true;
+                break;
         case ALL_KEY:
                 arguments->all = true;
                 break;

@@ -115,7 +115,6 @@ bool is_supported_device(const struct usb_info *usb_info)
 
 int setup_at_port(struct at_port *port)
 {
-        // TODO: skirtingi modeliai gali reikalauti skirtingus nustatymus
         if (port == NULL) {
                 return EXIT_FAILURE;
         }
@@ -180,7 +179,7 @@ int find_any_at_port(struct at_port *result)
 }
 
 
-struct cJSON *at_execute(struct context *ctx, const char *cmd, size_t cmd_len) // TODO: improve error handling (use goto)
+struct cJSON *at_execute(struct context *ctx, const char *cmd, size_t cmd_len)
 {
         if (ctx->port == NULL || cmd == NULL || cmd_len < 2) {
                 return NULL;
@@ -212,7 +211,12 @@ struct cJSON *at_execute(struct context *ctx, const char *cmd, size_t cmd_len) /
                                 break;
                         }
                         cJSON_AddItemToArray(result, str_json);
-                        if (is_end(buf, len)) {
+                        if (is_error(buf, len)) {
+                                success = false;
+                                break;
+                        }
+
+                        if (is_ok(buf, len)) {
                                 success = true;
                                 break;
                         }
