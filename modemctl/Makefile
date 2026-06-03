@@ -1,8 +1,5 @@
 include $(TOPDIR)/rules.mk
 
-# TARGET_CFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer
-# TARGET_LDFLAGS += -fsanitize=address,undefined
-
 PKG_NAME:=modemctl
 PKG_RELEASE:=1
 PKG_VERSION:=1.0.0
