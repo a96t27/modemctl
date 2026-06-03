@@ -7,8 +7,8 @@ PKG_VERSION:=1.0.0
 include $(INCLUDE_DIR)/package.mk
 
 define Package/modemctl
-	CATEGORY := Net
-	TITLE:=Modemctl
+	CATEGORY:=Network
+	TITLE:=modemctl
 	DEPENDS := cJSON
 endef
 
